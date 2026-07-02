@@ -3,8 +3,9 @@
  * always yields a deep-equal GameState (asserted by unit tests), which is
  * what makes lockstep/local replay and later server authority possible.
  */
+import { requiredProgress } from './dam';
 import { rngStep } from './rng';
-import type { GamePhase, GameState, OtterState } from './types';
+import type { GamePhase, GameState, ItemState, ItemType, OtterState, Vec2 } from './types';
 
 export interface GameConfig {
   /** Number of otters (players and, later, AI fill-ins). Clamped to 1..10. */
@@ -22,6 +23,12 @@ export interface GameConfig {
   readonly damRequiredPerPlayer?: number;
   /** World bounds used for spawning (and P1-01 movement clamping). */
   readonly world?: { readonly width: number; readonly height: number };
+  /**
+   * Explicit item placement (tests, scripted scenarios). When omitted,
+   * branches are scattered deterministically from the seed so a default
+   * round is winnable.
+   */
+  readonly items?: readonly { readonly id: string; readonly type: ItemType; readonly pos: Vec2 }[];
 }
 
 export const DEFAULT_TIMER_MS = 240_000;
@@ -46,21 +53,50 @@ export function createInitialState(config: GameConfig): GameState {
       id,
       pos: { x: sx.value * world.width, y: sy.value * world.height },
       facing: 'down',
+      vel: { x: 0, y: 0 },
       action: 'idle',
       carrying: null,
       speedPerSec: DEFAULT_OTTER_SPEED_PER_SEC,
       stunnedMs: 0,
+      wantsBuild: false,
       score: 0,
     };
+  }
+
+  const required = requiredProgress(playerCount, damRequiredPerPlayer);
+  const damSite: Vec2 = { x: world.width / 2, y: 96 };
+
+  const items: Record<string, ItemState> = {};
+  if (config.items) {
+    for (const it of config.items) {
+      items[it.id] = { id: it.id, type: it.type, pos: it.pos, heldBy: null };
+    }
+  } else {
+    // Default: scatter 2x the required branches so a round is comfortably
+    // winnable; deterministic from the seed.
+    const count = Math.ceil(required * 2);
+    for (let i = 1; i <= count; i++) {
+      const rx = rngStep(seed);
+      const ry = rngStep(rx.nextSeed);
+      seed = ry.nextSeed;
+      const id = `branch-${i}`;
+      items[id] = {
+        id,
+        type: 'branch',
+        pos: { x: rx.value * world.width, y: world.height * 0.35 + ry.value * world.height * 0.6 },
+        heldBy: null,
+      };
+    }
   }
 
   return {
     tick: 0,
     phase: config.phase ?? 'playing',
     timerMs: config.timerMs ?? DEFAULT_TIMER_MS,
-    dam: { progress: 0, required: playerCount * damRequiredPerPlayer },
+    dam: { progress: 0, required, site: damSite },
     otters,
-    items: {}, // item spawning arrives with P1-02/P2 systems
+    world: { width: world.width, height: world.height },
+    items,
     rngSeed: seed,
   };
 }

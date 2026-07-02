@@ -1,0 +1,126 @@
+/**
+ * P1-03: dam requirement curve + co-op build bonus.
+ */
+import { describe, expect, it } from 'vitest';
+import {
+  BUILD_RADIUS,
+  coopMultiplier,
+  damSystem,
+  requiredProgress,
+} from '../../../src/core/dam';
+import { createInitialState } from '../../../src/core/state';
+import { reduce } from '../../../src/core/tick';
+import type { GameState } from '../../../src/core/types';
+
+const TICK_MS = 50;
+const WORLD = { width: 1000, height: 800 };
+
+/** Exhaustive curve for the default base of 20: required = round(20 * n^0.85). */
+const EXPECTED_CURVE: Record<number, number> = {
+  1: 20, 2: 36, 3: 51, 4: 65, 5: 79, 6: 92, 7: 105, 8: 117, 9: 129, 10: 142,
+};
+
+function atDam(playerCount: number, itemsNearDam: number): GameState {
+  const s = createInitialState({
+    playerCount,
+    seed: 1,
+    world: WORLD,
+    items: Array.from({ length: itemsNearDam }, (_, i) => ({
+      id: `b${i + 1}`,
+      type: 'branch' as const,
+      pos: { x: 500, y: 120 },
+    })),
+  });
+  const otters = Object.fromEntries(
+    Object.values(s.otters).map((o) => [o.id, { ...o, pos: { x: 500, y: 120 } }]),
+  );
+  return { ...s, otters };
+}
+
+describe('core/dam (P1-03)', () => {
+  it('requirement curve is sub-linear and exhaustively matches for 1-10 players', () => {
+    for (let n = 1; n <= 10; n++) {
+      expect(requiredProgress(n, 20), `players=${n}`).toBe(EXPECTED_CURVE[n]);
+    }
+    // sanity: total grows, per-player need shrinks
+    for (let n = 2; n <= 10; n++) {
+      expect(requiredProgress(n, 20)).toBeGreaterThan(requiredProgress(n - 1, 20));
+      expect(requiredProgress(n, 20) / n).toBeLessThan(requiredProgress(n - 1, 20) / (n - 1));
+    }
+  });
+
+  it('coop multiplier: 1x solo, +0.25 per extra simultaneous builder', () => {
+    expect(coopMultiplier(1)).toBe(1);
+    expect(coopMultiplier(2)).toBe(1.25);
+    expect(coopMultiplier(4)).toBe(1.75);
+  });
+
+  it('build while carrying a branch near the site adds progress and consumes the branch', () => {
+    let s = atDam(1, 2);
+    ({ state: s } = reduce(s, [{ type: 'pickUp', playerId: 'otter-1' }], TICK_MS));
+    const { state, events } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    expect(state.dam.progress).toBe(1);
+    expect(state.otters['otter-1']?.carrying).toBeNull();
+    expect(state.otters['otter-1']?.score).toBe(1);
+    expect(Object.keys(state.items)).toHaveLength(1); // b consumed
+    expect(events).toContainEqual({
+      type: 'damProgressed', playerId: 'otter-1', amount: 1, progress: 1,
+    });
+  });
+
+  it('two otters building in the same tick each get the 1.25x co-op bonus', () => {
+    let s = atDam(2, 4);
+    ({ state: s } = reduce(s, [
+      { type: 'pickUp', playerId: 'otter-1' },
+      { type: 'pickUp', playerId: 'otter-2' },
+    ], TICK_MS));
+    const { state } = reduce(s, [
+      { type: 'build', playerId: 'otter-1' },
+      { type: 'build', playerId: 'otter-2' },
+    ], TICK_MS);
+    expect(state.dam.progress).toBeCloseTo(2.5);
+    expect(state.otters['otter-1']?.score).toBeCloseTo(1.25);
+    expect(state.otters['otter-2']?.score).toBeCloseTo(1.25);
+  });
+
+  it('rejects build with empty paws and build too far from the dam', () => {
+    const s = atDam(1, 1);
+    const empty = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    expect(empty.events).toContainEqual({
+      type: 'commandRejected', playerId: 'otter-1', command: 'build', reason: 'noBranch',
+    });
+
+    let far = atDam(1, 1);
+    ({ state: far } = reduce(far, [{ type: 'pickUp', playerId: 'otter-1' }], TICK_MS));
+    const o = far.otters['otter-1'];
+    if (!o) throw new Error('missing otter');
+    far = {
+      ...far,
+      otters: {
+        'otter-1': { ...o, pos: { x: 500, y: 96 + BUILD_RADIUS + 1 } },
+      },
+    };
+    const { events } = reduce(far, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    expect(events).toContainEqual({
+      type: 'commandRejected', playerId: 'otter-1', command: 'build', reason: 'tooFarFromDam',
+    });
+  });
+
+  it('progress caps at required and completion wins instantly (gameWon once)', () => {
+    let s = atDam(1, 25);
+    s = { ...s, dam: { ...s.dam, progress: s.dam.required - 0.5 } };
+    ({ state: s } = reduce(s, [{ type: 'pickUp', playerId: 'otter-1' }], TICK_MS));
+    const { state, events } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    expect(state.dam.progress).toBe(state.dam.required);
+    expect(state.phase).toBe('won');
+    expect(events.filter((e) => e.type === 'gameWon')).toHaveLength(1);
+    // won phase: further commands are rejected, no more win events
+    const after = reduce(state, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    expect(after.events.filter((e) => e.type === 'gameWon')).toHaveLength(0);
+  });
+
+  it('damSystem is identity (same reference) when nobody builds', () => {
+    const s = atDam(3, 1);
+    expect(damSystem(s, TICK_MS, [])).toBe(s);
+  });
+});

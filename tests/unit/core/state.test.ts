@@ -5,6 +5,7 @@ import {
   DEFAULT_TIMER_MS,
   DEFAULT_WORLD,
 } from '../../../src/core/state';
+import { requiredProgress } from '../../../src/core/dam';
 
 describe('core/state createInitialState', () => {
   it('is deterministic: same config -> deep-equal state', () => {
@@ -26,9 +27,14 @@ describe('core/state createInitialState', () => {
     expect(s.phase).toBe('playing');
     expect(s.timerMs).toBe(DEFAULT_TIMER_MS);
     expect(s.dam.progress).toBe(0);
-    expect(s.dam.required).toBe(3 * DEFAULT_DAM_REQUIRED_PER_PLAYER);
+    expect(s.dam.required).toBe(requiredProgress(3, DEFAULT_DAM_REQUIRED_PER_PLAYER));
     expect(Object.keys(s.otters)).toHaveLength(3);
-    expect(s.items).toEqual({});
+    // default rounds scatter 2x required branches so the round is winnable
+    expect(Object.keys(s.items)).toHaveLength(Math.ceil(s.dam.required * 2));
+    for (const item of Object.values(s.items)) {
+      expect(item.type).toBe('branch');
+      expect(item.heldBy).toBeNull();
+    }
   });
 
   it('spawns otters idle, empty-handed, inside the world bounds', () => {
@@ -55,7 +61,7 @@ describe('core/state createInitialState', () => {
     });
     expect(s.timerMs).toBe(60_000);
     expect(s.phase).toBe('lobby');
-    expect(s.dam.required).toBe(100);
+    expect(s.dam.required).toBe(requiredProgress(2, 50));
   });
 
   it('clamps playerCount to the supported 1..10 range', () => {

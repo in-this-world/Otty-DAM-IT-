@@ -11,6 +11,10 @@
  *   3. run systems (P1 plugs in movement/inventory/dam/timer here)
  *   4. emit tickCompleted
  */
+import { damSystem, applyBuild } from './dam';
+import { applyDrop, applyPickUp } from './inventory';
+import { applyMove, applyStop, isDirection, movementSystem } from './movement';
+import { timerSystem } from './timer';
 import type { Command, CommandType, GameEvent, GameState } from './types';
 
 /**
@@ -20,8 +24,12 @@ import type { Command, CommandType, GameEvent, GameState } from './types';
  */
 export type System = (state: GameState, dtMs: number, events: GameEvent[]) => GameState;
 
-/** Default pipeline. Empty in P0; P1 systems are appended here. */
-export const defaultSystems: readonly System[] = [];
+/**
+ * Default pipeline (order matters): movement integrates positions, dam
+ * resolves the tick's builds (may win instantly), timer counts down and
+ * settles the flood last.
+ */
+export const defaultSystems: readonly System[] = [movementSystem, damSystem, timerSystem];
 
 export interface ReduceResult {
   readonly state: GameState;
@@ -91,12 +99,16 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
 
   switch (command.type) {
     case 'move': {
+      if (!isDirection(command.dir)) {
+        reject(events, command, 'unknownDirection');
+        return state;
+      }
       events.push({ type: 'otterMoved', playerId: command.playerId, dir: command.dir });
-      return state; // P1-01: set facing/action here, integrate pos in movement system
+      return applyMove(state, otter, command.dir);
     }
     case 'stop': {
       events.push({ type: 'otterStopped', playerId: command.playerId });
-      return state;
+      return applyStop(state, otter);
     }
     case 'poke': {
       events.push({ type: 'otterPoked', attackerId: command.playerId, targetId: null });
@@ -104,16 +116,15 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
     }
     case 'build': {
       events.push({ type: 'buildAttempted', playerId: command.playerId });
-      return state; // P1-03: consume carried material -> damProgressed / gameWon
+      return applyBuild(state, otter, (reason) => reject(events, command, reason));
     }
     case 'pickUp': {
-      // P1-02 implements range checks against state.items; nothing exists yet.
-      reject(events, command, 'noItemInRange');
-      return state;
+      return applyPickUp(state, otter, command.itemId, events, (reason) =>
+        reject(events, command, reason),
+      );
     }
     case 'drop': {
-      reject(events, command, otter.carrying === null ? 'notCarrying' : 'notImplemented');
-      return state; // P1-02
+      return applyDrop(state, otter, events, (reason) => reject(events, command, reason));
     }
     case 'useItem': {
       reject(events, command, otter.carrying === null ? 'nothingToUse' : 'notImplemented');

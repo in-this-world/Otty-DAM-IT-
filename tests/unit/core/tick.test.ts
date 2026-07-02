@@ -16,10 +16,10 @@ function firstOtterId(state: GameState): string {
 }
 
 describe('core/tick reduce', () => {
-  it('empty tick only advances the tick counter, everything else deep-equal', () => {
+  it('empty tick only advances the tick counter and timer, everything else deep-equal', () => {
     const input = playing();
     const { state, events } = reduce(input, [], TICK_MS);
-    expect(state).toEqual({ ...input, tick: input.tick + 1 });
+    expect(state).toEqual({ ...input, tick: input.tick + 1, timerMs: input.timerMs - TICK_MS });
     expect(events).toEqual([{ type: 'tickCompleted', tick: input.tick + 1 }]);
   });
 

@@ -25,6 +25,8 @@ export interface OtterState {
   readonly id: string;
   readonly pos: Vec2;
   readonly facing: Direction;
+  /** Current velocity in world units/sec (P1-01); {0,0} when standing. */
+  readonly vel: Vec2;
   readonly action: OtterAction;
   /** Item type in paws, or null when empty-handed (P1-02). */
   readonly carrying: ItemType | null;
@@ -32,7 +34,9 @@ export interface OtterState {
   readonly speedPerSec: number;
   /** Remaining stun after being poked / eagle-grabbed, in ms (P2). */
   readonly stunnedMs: number;
-  /** Personal contribution, used for flood settlement when the round is lost. */
+  /** Set by a valid build command; consumed by the dam system each tick (P1-03). */
+  readonly wantsBuild: boolean;
+  /** Personal contribution (dam progress added), used for flood settlement. */
   readonly score: number;
 }
 
@@ -51,6 +55,8 @@ export interface DamState {
   readonly progress: number;
   /** Progress needed to win; scales with player count (P1-03). */
   readonly required: number;
+  /** Dam build site location; build commands must be issued within range. */
+  readonly site: Vec2;
 }
 
 /**
@@ -64,6 +70,8 @@ export interface GameState {
   readonly timerMs: number;
   readonly dam: DamState;
   readonly otters: Readonly<Record<string, OtterState>>;
+  /** World bounds; movement clamps positions to this rect (P1-01). */
+  readonly world: { readonly width: number; readonly height: number };
   readonly items: Readonly<Record<string, ItemState>>;
   /** Current mulberry32 seed; advance only via rngStep to stay deterministic. */
   readonly rngSeed: number;
@@ -108,8 +116,8 @@ export type GameEvent =
   | { readonly type: 'itemUsed'; readonly playerId: string; readonly itemType: ItemType }
   | { readonly type: 'buildAttempted'; readonly playerId: string }
   | { readonly type: 'damProgressed'; readonly playerId: string; readonly amount: number; readonly progress: number }
-  | { readonly type: 'gameWon'; readonly tick: number }
-  | { readonly type: 'gameLost'; readonly tick: number }
+  | { readonly type: 'gameWon'; readonly tick: number; readonly scores: Readonly<Record<string, number>> }
+  | { readonly type: 'gameLost'; readonly tick: number; readonly scores: Readonly<Record<string, number>> }
   | { readonly type: 'tickCompleted'; readonly tick: number };
 
 export type GameEventType = GameEvent['type'];
