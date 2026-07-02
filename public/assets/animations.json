@@ -1,0 +1,78 @@
+{
+  "animations": [
+    {
+      "key": "idle",
+      "frames": [
+        "idle_0",
+        "idle_1",
+        "idle_2",
+        "idle_3"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "walk",
+      "frames": [
+        "walk_0",
+        "walk_1",
+        "walk_2",
+        "walk_3"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "carry",
+      "frames": [
+        "carry_0",
+        "carry_1",
+        "carry_2",
+        "carry_3"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "poke",
+      "frames": [
+        "poke_0",
+        "poke_1",
+        "poke_2"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "eat",
+      "frames": [
+        "eat_0",
+        "eat_1",
+        "eat_2"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "float",
+      "frames": [
+        "float_0",
+        "float_1",
+        "float_2",
+        "float_3"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "build",
+      "frames": [
+        "build_0",
+        "build_1",
+        "build_2"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    }
+  ]
+}
