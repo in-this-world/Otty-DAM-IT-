@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast static + unit gate. Kept separate from e2e so lint/type/unit
+  # failures surface in ~1 min without waiting for browser install,
+  # and both jobs run in parallel.
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck, lint, unit tests
+        run: npm run check
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright smoke tests
+        run: npm run e2e
+        env:
+          CI: 'true'
+      # NOTE (first-run baselines): until linux baselines exist under
+      # tests/e2e/__screenshots__/, toHaveScreenshot fails and writes the
+      # candidate image into test-results/. Download the artifact below,
+      # review the image, commit it as the baseline, and re-run.
+      - name: Upload Playwright report and results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
