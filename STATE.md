@@ -3,13 +3,14 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-03 · by Claude (wave 7:AI 調校——路徑平滑〔stepToward,換向 ~200→~55〕+ 可調慢 AI〔speedByOtter + ?aiSpeed,預設 55%=110u/s〕;headless playtest 找 bug;Playwright 瀏覽器於 sandbox 不可跑〔CDN 擋+無 root+無連線 Chrome〕。`npm run check` 159 綠 + build 綠)
 2026-07-03 · by Claude (wave 6:P2-02 戳人〔命中+掉物+2s 無敵幀+F 鍵〕真正實作;P2-03 water + P2-05 AI 接進 GameScene 遊戲迴圈〔?ai=N,預設補 2 隻〕;`npm run check` 155 測試全過、`vite build` 綠)
 2026-07-03 · by Claude (wave 5 平行:P2-03 漂浮/水獺筏/洗澡去 debuff + P2-05 AI 水獺行為樹,兩支 feature branch 並行開發、測綠併回 main;`npm run check` 145 測試全過)
 2026-07-03 · by Claude(流程更新:E2E 可在 sandbox 由 agent 跑〔MCP 已修〕、每任務留 `Docs/` 摘要、feature branch → 測綠才併 `main`)
 2026-07-02 · by Claude (wave 4: P0-02 收尾、P2-01 道具、P1-08 完整一局 E2E)
 
 ## 專案現況
-- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:**155 測試全過**。**P2-02(戳人)真正實作完成;P2-03(漂浮/水獺筏/洗澡)、P2-05(AI 水獺補位)已接進 GameScene 遊戲迴圈。**
+- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:**159 測試全過**。**P2-02(戳人)真正實作完成;P2-03(漂浮/水獺筏/洗澡)、P2-05(AI 水獺補位)已接進 GameScene 遊戲迴圈。**
 - GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(已 push;**Actions 尚未看到 run,待排查**)。
 - 遊戲可跑:`npm run dev` → Boot(atlas+動畫註冊)→ GameScene:1P + 撒滿樹枝的場地,WASD/方向鍵移動、E/空白鍵撿放、B 建造、180s 倒數、勝負 overlay、R 重開。
 - git repo 已建(main,7 commits,任務 ID 開頭)。**分支策略(新):每組功能開 feature branch(如 `feat/P2-props`),測試全綠才併回 `main`;`main` 永遠保持可玩、綠燈。** **注意:repo 在 sandbox 開發後同步回本資料夾,Windows 端首次使用建議 `git status` 確認(可能有 CRLF 造成的假差異,`git add --renormalize .` 可解)。**
@@ -47,6 +48,8 @@
 - 2026-07-03:**P2-02 戳人**:`applyPoke`——`POKE_RADIUS`=56 內最近他獺掉手上物品(落腳邊)+ 得 `POKE_INVULN_MS`=2000 無敵(掛在受害者、防連續騷擾);無敵中彈開不掉物。additive `OtterState.invulnMs?`,於 effects 逐 tick 衰減。輸入鍵 **F**(D 已右移)。不加暈眩(僅掉物+無敵)。
 - 2026-07-03:**P2-03/P2-05 接線**:GameScene 傳 `water`(佔位 `{40,372,250,140}`)給 adapter;`driveAi` 每 tick 對非玩家水獺呼叫 `planOtterCommands` 回灌 adapter。AI 數 = `?ai ?? recommendedAiCount(1,3)`=2;`?ai=N`(0..8)覆寫,E2E 全 pin `ai=0`。AI 判定=id≠PLAYER_ID(不進 core 型別)。
 
+- 2026-07-03:**P2-05 AI 調校**:`ai.ts` 新增 `stepToward`(固定先水平後垂直 + `AI_AXIS_DEADBAND=16`)取代 dominant-axis,消除斜向樓梯抖動(換向 ~200→~55)。可調慢:core 泛用 `GameConfig.speedByOtter`;`?aiSpeed=%`(10..100),GameScene 預設 `DEFAULT_AI_SPEED_PCT=55`(AI 110u/s,人類 200 一半)。playtest 驗證仍能於時限內完壩。
+
 ## 已知問題 / 注意
 - Assets 檔名含中文與空格,管線腳本處理路徑要加引號
 - 幀規格不一(627² ×4 vs 724² ×3),管線已支援兩種網格
@@ -54,9 +57,8 @@
 - Vite build 有 >500KB chunk 警告(Phaser 本體),P4 再做 code-split;首載預算屆時驗證
 - 去背管線:羽化邊緣無 matte decontamination、固定 tolerance 26(詳 Docs/P0-03_summary.md)
 
-## 待決 / 給 boss 的問題(更新:2026-07-03 wave 6)
-1. ✅ **已解決** — P2-02 戳人已真正實作(命中+掉物+2s 無敵幀+F 鍵+7 測試)。
-2. ✅ **已解決** — P2-03 water + P2-05 AI 已接進 GameScene 遊戲迴圈(單機預設補 2 隻 AI 隊友;`?ai=N` 可調)。
-3. **E2E 首跑(仍待)**:本 wave 以 `npm run check`(155 綠)+ `vite build` 綠 + 一支薄整合測試(AI 隊友走真正 adapter 路徑蓋壩獲勝)作回歸驗證;完整 Playwright 瀏覽器 E2E 仍待首跑補 linux 基準截圖。要下個 session 用瀏覽器 MCP 首跑嗎?
-4. **AI 難度/水域設計**:solo 預設補 2 隻 AI 會讓遊戲變簡單;水域目前是佔位座標。要調整 AI 預設數量/難度、或等正式關卡與美術再定水域嗎?
-5. **CRLF/handoff**:sandbox 開發,`git bundle`(repo.bundle,head=wave6)交回。Windows 端 `git pull .\repo.bundle main` 快轉;CRLF 假差異用 `git add --renormalize .`。
+## 待決 / 給 boss 的問題(更新:2026-07-03 wave 7)
+1. ✅ 已解決 — 「AI 太快/亂抖」:已平滑路徑(換向 ~4-5× 少)並可調慢(預設 55%);`?ai=N`、`?aiSpeed=%` 可再調。
+2. **Playwright 瀏覽器 E2E 於此 sandbox 不可跑**:Playwright Chromium 下載被 allowlist 擋(403)、無 root 不能 apt、claude-in-chrome 目前無連線瀏覽器。→ 在**你的機器**上 `npx playwright install chromium` 後 `npm run e2e`(specs 已 pin `?ai=0`);或裝 Chrome 擴充並連線,下個 session 我用瀏覽器 MCP 實跑並補 linux 基準截圖。目前回歸靠 `npm run check`(159)+`vite build`+headless playtest。
+3. **AI 難度/水域**:預設 2 隻 AI、55% 速;水域仍佔位座標。要調預設或等正式關卡?
+4. **handoff**:本 wave 已直接把 commit 寫進你的 `.git`(pack + refs/heads/main),並更新 `repo.bundle`。Windows 端 `git reset --hard main` 同步工作樹後即可 `git push`。
