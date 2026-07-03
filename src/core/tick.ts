@@ -7,29 +7,37 @@
  *
  * Pipeline per tick:
  *   1. advance tick counter
- *   2. apply queued commands in order (validation -> events, P0 = stubs)
- *   3. run systems (P1 plugs in movement/inventory/dam/timer here)
+ *   2. apply queued commands in order (validation -> events)
+ *   3. run systems (movement -> effects -> dam -> timer)
  *   4. emit tickCompleted
  */
 import { damSystem, applyBuild } from './dam';
+import { effectsSystem } from './effects';
 import { applyDrop, applyPickUp } from './inventory';
+import { applyDig, applyThrow, applyUseItem } from './items';
 import { applyMove, applyStop, isDirection, movementSystem } from './movement';
 import { timerSystem } from './timer';
 import type { Command, CommandType, GameEvent, GameState } from './types';
 
 /**
  * A system transforms state once per tick and may append events.
- * P1 tasks register movement (P1-01), inventory (P1-02), dam (P1-03) and
- * timer/flood (P1-04) as entries in this pipeline.
+ * P1 tasks registered movement (P1-01), dam (P1-03) and timer/flood
+ * (P1-04); P2-01 added effects (buff/stun decay, pits).
  */
 export type System = (state: GameState, dtMs: number, events: GameEvent[]) => GameState;
 
 /**
- * Default pipeline (order matters): movement integrates positions, dam
- * resolves the tick's builds (may win instantly), timer counts down and
- * settles the flood last.
+ * Default pipeline (order matters): movement integrates positions, effects
+ * decays buffs/stuns and resolves pit collisions (after movement, so
+ * walking into a pit triggers the same tick), dam resolves the tick's
+ * builds (may win instantly), timer counts down and settles the flood last.
  */
-export const defaultSystems: readonly System[] = [movementSystem, damSystem, timerSystem];
+export const defaultSystems: readonly System[] = [
+  movementSystem,
+  effectsSystem,
+  damSystem,
+  timerSystem,
+];
 
 export interface ReduceResult {
   readonly state: GameState;
@@ -62,6 +70,8 @@ const KNOWN_COMMAND_TYPES: readonly CommandType[] = [
   'pickUp',
   'drop',
   'useItem',
+  'throwItem',
+  'dig',
   'poke',
   'build',
 ];
@@ -82,10 +92,6 @@ function reject(events: GameEvent[], command: Command, reason: string): void {
   });
 }
 
-/**
- * P0 behaviour: validate, then emit the corresponding event without touching
- * state. P1 tasks replace the stub branches with real state transitions.
- */
 function applyCommand(state: GameState, command: Command, events: GameEvent[]): GameState {
   const otter = state.otters[command.playerId];
   if (!otter) {
@@ -94,6 +100,11 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
   }
   if (state.phase !== 'playing') {
     reject(events, command, 'notPlaying');
+    return state;
+  }
+  if (otter.stunnedMs > 0) {
+    // Dizzy otters can't act at all (P2-01); the stun decays in effectsSystem.
+    reject(events, command, 'stunned');
     return state;
   }
 
@@ -112,7 +123,7 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
     }
     case 'poke': {
       events.push({ type: 'otterPoked', attackerId: command.playerId, targetId: null });
-      return state; // P1/P2: hit detection, stun, item knock-off
+      return state; // P2-02: hit detection, stun, item/hat knock-off
     }
     case 'build': {
       events.push({ type: 'buildAttempted', playerId: command.playerId });
@@ -127,8 +138,13 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
       return applyDrop(state, otter, events, (reason) => reject(events, command, reason));
     }
     case 'useItem': {
-      reject(events, command, otter.carrying === null ? 'nothingToUse' : 'notImplemented');
-      return state; // P2 item effects (eat fish, cone, ...)
+      return applyUseItem(state, otter, events, (reason) => reject(events, command, reason));
+    }
+    case 'throwItem': {
+      return applyThrow(state, otter, events, (reason) => reject(events, command, reason));
+    }
+    case 'dig': {
+      return applyDig(state, otter, events, (reason) => reject(events, command, reason));
     }
     default: {
       // Exhaustive for TS, but reachable with untrusted runtime input.
