@@ -1,23 +1,33 @@
 /**
- * P1-03: dam progress.
+ * P1-03: dam progress. P2-01: multi-material builds.
  *
  * Requirement curve: required = round(base * playerCount^0.85).
  * Sub-linear so bigger lobbies need more total branches but fewer per
  * player (co-op should feel easier with friends, not harder):
  *   base 20 -> 1P: 20, 2P: 36, 5P: 79, 10P: 142.
  *
- * Build flow: a valid `build` command (carrying a branch, within
+ * Build flow: a valid `build` command (carrying a build material, within
  * BUILD_RADIUS of dam.site) marks the otter `wantsBuild`. The dam system
  * then resolves all builders of the tick together, applying a cooperation
- * bonus: each build contributes 1 * (1 + 0.25 * (builders - 1)).
+ * bonus: each build contributes BUILD_AMOUNTS[material] * (1 + 0.25 *
+ * (builders - 1)). Materials (v0.1 §4.2): branch 1, dirt 1, stone 3.
  * Progress is capped at `required`; reaching it wins the round instantly.
  */
-import type { GameEvent, GameState, OtterState } from './types';
+import type { GameEvent, GameState, ItemType, OtterState } from './types';
 
 /** Max distance from dam.site at which building is allowed. */
 export const BUILD_RADIUS = 120;
 /** Base progress per delivered branch. */
 export const BUILD_AMOUNT = 1;
+/**
+ * Base progress per material (P2-01). Item types missing here (fish, cone)
+ * are not build materials and are rejected with 'noBuildMaterial'.
+ */
+export const BUILD_AMOUNTS: Partial<Record<ItemType, number>> = {
+  branch: BUILD_AMOUNT,
+  dirt: 1,
+  stone: 3,
+};
 /** Extra multiplier per additional simultaneous builder. */
 export const COOP_BONUS_PER_EXTRA_BUILDER = 0.25;
 
@@ -33,8 +43,8 @@ type Reject = (reason: string) => void;
 
 /** Command handler: validate and mark intent; resolution happens in damSystem. */
 export function applyBuild(state: GameState, otter: OtterState, reject: Reject): GameState {
-  if (otter.carrying !== 'branch') {
-    reject('noBranch');
+  if (otter.carrying === null || BUILD_AMOUNTS[otter.carrying] === undefined) {
+    reject('noBuildMaterial');
     return state;
   }
   const d = Math.hypot(otter.pos.x - state.dam.site.x, otter.pos.y - state.dam.site.y);
@@ -67,9 +77,10 @@ export function damSystem(state: GameState, _dtMs: number, events: GameEvent[]):
   let progress = state.dam.progress;
 
   for (const b of builders) {
-    const amount = Math.min(BUILD_AMOUNT * mult, state.dam.required - progress);
+    const base = (b.carrying !== null ? BUILD_AMOUNTS[b.carrying] : undefined) ?? 0;
+    const amount = Math.min(base * mult, state.dam.required - progress);
     progress += amount;
-    // consume the carried branch
+    // consume the carried material
     const held = Object.values(items).find((i) => i.heldBy === b.id);
     if (held) delete items[held.id];
     otters[b.id] = {

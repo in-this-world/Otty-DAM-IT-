@@ -29,12 +29,20 @@ describe('core/state createInitialState', () => {
     expect(s.dam.progress).toBe(0);
     expect(s.dam.required).toBe(requiredProgress(3, DEFAULT_DAM_REQUIRED_PER_PLAYER));
     expect(Object.keys(s.otters)).toHaveLength(3);
-    // default rounds scatter 2x required branches so the round is winnable
+    // default rounds scatter 2x required progress in items (P2-01 mix:
+    // mostly branches, a sprinkle of fish and stones) so the round is winnable
     expect(Object.keys(s.items)).toHaveLength(Math.ceil(s.dam.required * 2));
+    const byType = { branch: 0, fish: 0, stone: 0, cone: 0, dirt: 0 };
     for (const item of Object.values(s.items)) {
-      expect(item.type).toBe('branch');
+      byType[item.type] += 1;
       expect(item.heldBy).toBeNull();
     }
+    expect(byType.branch).toBeGreaterThan(Object.keys(s.items).length / 2);
+    expect(byType.fish).toBeGreaterThanOrEqual(1);
+    expect(byType.stone).toBeGreaterThanOrEqual(1);
+    expect(byType.cone).toBe(0);
+    expect(byType.dirt).toBe(0);
+    expect(s.pits).toEqual([]);
   });
 
   it('spawns otters idle, empty-handed, inside the world bounds', () => {
@@ -43,6 +51,8 @@ describe('core/state createInitialState', () => {
       expect(otter.action).toBe('idle');
       expect(otter.carrying).toBeNull();
       expect(otter.stunnedMs).toBe(0);
+      expect(otter.speedBoostMs).toBe(0);
+      expect(otter.hat).toBeNull();
       expect(otter.score).toBe(0);
       expect(otter.pos.x).toBeGreaterThanOrEqual(0);
       expect(otter.pos.x).toBeLessThanOrEqual(DEFAULT_WORLD.width);

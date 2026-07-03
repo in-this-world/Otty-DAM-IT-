@@ -47,7 +47,10 @@ export class GameScene extends Phaser.Scene {
       playerCount: 1,
       seed: params.seed ?? (Date.now() % 0xffffffff) >>> 0,
       world: WORLD,
-      timerMs: 180_000,
+      timerMs: params.timer ?? 180_000,
+      // E2E hook (?required=N): shrink the win condition so a full
+      // win round fits inside a test budget. Omitted -> core default.
+      ...(params.required !== null ? { damRequiredPerPlayer: params.required } : {}),
     });
 
     this.cameras.main.setBackgroundColor('#2d6a7a');

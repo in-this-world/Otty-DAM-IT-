@@ -1,8 +1,19 @@
 /**
  * window.__otty — the read-only state snapshot that Playwright asserts
  * against (CLAUDE.md rule 5). PURE builder so its shape is unit-tested.
+ *
+ * P1-08 addition (additive, existing fields untouched): `items` lists the
+ * ground items with positions so the full-round E2E bot can navigate to
+ * branches. `itemsOnGround` is kept for older specs (= items.length).
  */
 import type { GameState } from '../core/types';
+
+export interface SnapshotItem {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly type: string;
+}
 
 export interface OttySnapshot {
   readonly ready: boolean;
@@ -14,6 +25,8 @@ export interface OttySnapshot {
     Record<string, { x: number; y: number; action: string; carrying: string | null }>
   >;
   readonly itemsOnGround: number;
+  /** Items currently lying on the ground (held items are excluded). */
+  readonly items: readonly SnapshotItem[];
 }
 
 export function buildSnapshot(state: GameState): OttySnapshot {
@@ -22,6 +35,10 @@ export function buildSnapshot(state: GameState): OttySnapshot {
   for (const o of Object.values(state.otters)) {
     otters[o.id] = { x: o.pos.x, y: o.pos.y, action: o.action, carrying: o.carrying };
   }
+  const items: SnapshotItem[] = [];
+  for (const i of Object.values(state.items)) {
+    if (i.heldBy === null) items.push({ id: i.id, x: i.pos.x, y: i.pos.y, type: i.type });
+  }
   return {
     ready: true,
     tick: state.tick,
@@ -29,7 +46,8 @@ export function buildSnapshot(state: GameState): OttySnapshot {
     timerMs: state.timerMs,
     dam: { progress: state.dam.progress, required: state.dam.required },
     otters,
-    itemsOnGround: Object.values(state.items).filter((i) => i.heldBy === null).length,
+    itemsOnGround: items.length,
+    items,
   };
 }
 

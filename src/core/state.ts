@@ -25,8 +25,9 @@ export interface GameConfig {
   readonly world?: { readonly width: number; readonly height: number };
   /**
    * Explicit item placement (tests, scripted scenarios). When omitted,
-   * branches are scattered deterministically from the seed so a default
-   * round is winnable.
+   * items are scattered deterministically from the seed so a default
+   * round is winnable: mostly branches, with a sprinkle of fish and
+   * stones (P2-01; every 8th item is a fish, every 8th-offset-4 a stone).
    */
   readonly items?: readonly { readonly id: string; readonly type: ItemType; readonly pos: Vec2 }[];
 }
@@ -36,6 +37,13 @@ export const DEFAULT_DAM_REQUIRED_PER_PLAYER = 20;
 export const DEFAULT_WORLD = { width: 1280, height: 720 } as const;
 export const DEFAULT_OTTER_SPEED_PER_SEC = 200;
 export const MAX_PLAYERS = 10;
+
+/** Default scatter mix (P2-01): i%8==0 -> fish, i%8==4 -> stone, else branch. */
+function defaultItemType(i: number): ItemType {
+  if (i % 8 === 0) return 'fish';
+  if (i % 8 === 4) return 'stone';
+  return 'branch';
+}
 
 export function createInitialState(config: GameConfig): GameState {
   const playerCount = Math.max(1, Math.min(MAX_PLAYERS, Math.floor(config.playerCount)));
@@ -58,6 +66,8 @@ export function createInitialState(config: GameConfig): GameState {
       carrying: null,
       speedPerSec: DEFAULT_OTTER_SPEED_PER_SEC,
       stunnedMs: 0,
+      speedBoostMs: 0,
+      hat: null,
       wantsBuild: false,
       score: 0,
     };
@@ -72,17 +82,19 @@ export function createInitialState(config: GameConfig): GameState {
       items[it.id] = { id: it.id, type: it.type, pos: it.pos, heldBy: null };
     }
   } else {
-    // Default: scatter 2x the required branches so a round is comfortably
-    // winnable; deterministic from the seed.
+    // Default: scatter 2x the required progress in items so a round is
+    // comfortably winnable; deterministic from the seed. Mostly branches,
+    // plus a few fish (snacks/projectiles) and stones (heavy, 3 progress).
     const count = Math.ceil(required * 2);
     for (let i = 1; i <= count; i++) {
       const rx = rngStep(seed);
       const ry = rngStep(rx.nextSeed);
       seed = ry.nextSeed;
-      const id = `branch-${i}`;
+      const type = defaultItemType(i);
+      const id = `${type}-${i}`;
       items[id] = {
         id,
-        type: 'branch',
+        type,
         pos: { x: rx.value * world.width, y: world.height * 0.35 + ry.value * world.height * 0.6 },
         heldBy: null,
       };
@@ -97,6 +109,7 @@ export function createInitialState(config: GameConfig): GameState {
     otters,
     world: { width: world.width, height: world.height },
     items,
+    pits: [],
     rngSeed: seed,
   };
 }

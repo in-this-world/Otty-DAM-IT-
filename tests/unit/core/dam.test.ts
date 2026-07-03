@@ -87,7 +87,7 @@ describe('core/dam (P1-03)', () => {
     const s = atDam(1, 1);
     const empty = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
     expect(empty.events).toContainEqual({
-      type: 'commandRejected', playerId: 'otter-1', command: 'build', reason: 'noBranch',
+      type: 'commandRejected', playerId: 'otter-1', command: 'build', reason: 'noBuildMaterial',
     });
 
     let far = atDam(1, 1);

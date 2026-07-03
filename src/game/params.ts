@@ -1,13 +1,32 @@
 /**
  * URL test hooks (pure, unit-tested):
- *   ?seed=<uint>  fixed RNG seed -> deterministic branch layout
- *   ?freeze=1     don't start the sim clock + pause all animations
- * Both exist for visual-regression E2E (stable screenshots); normal play
- * uses neither.
+ *   ?seed=<uint>     fixed RNG seed -> deterministic branch layout
+ *   ?freeze=1        don't start the sim clock + pause all animations
+ *   ?timer=<ms>      override round length, clamped to 1s..10min (P1-08)
+ *   ?required=<n>    override damRequiredPerPlayer, clamped to 1..100 (P1-08)
+ * All exist for E2E (stable screenshots / short win-lose rounds); normal
+ * play uses none of them.
  */
 export interface GameParams {
   readonly seed: number | null;
   readonly freeze: boolean;
+  /** Round length override in ms, or null to use the scene default. */
+  readonly timer: number | null;
+  /** damRequiredPerPlayer override, or null to use the core default. */
+  readonly required: number | null;
+}
+
+export const TIMER_MIN_MS = 1_000;
+export const TIMER_MAX_MS = 600_000;
+export const REQUIRED_MIN = 1;
+export const REQUIRED_MAX = 100;
+
+/** Parse an integer param; garbage -> null, out-of-range -> clamped. */
+function clampedInt(raw: string | null, min: number, max: number): number | null {
+  if (raw === null) return null;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 export function parseGameParams(search: string): GameParams {
@@ -18,5 +37,7 @@ export function parseGameParams(search: string): GameParams {
   return {
     seed: Number.isFinite(parsed) && parsed >= 0 ? parsed >>> 0 : null,
     freeze: freezeRaw === '1' || freezeRaw === 'true',
+    timer: clampedInt(params.get('timer'), TIMER_MIN_MS, TIMER_MAX_MS),
+    required: clampedInt(params.get('required'), REQUIRED_MIN, REQUIRED_MAX),
   };
 }
