@@ -45,6 +45,33 @@ export function directionToward(from: Vec2, to: Vec2): Direction {
   return dy >= 0 ? 'down' : 'up';
 }
 
+/**
+ * How close (world units) on an axis counts as "aligned" — below this the AI
+ * stops nudging that axis, which prevents per-tick left/right (or up/down)
+ * jitter when it is basically lined up. See AI_AXIS_DEADBAND.
+ */
+export const AI_AXIS_DEADBAND = 16;
+
+/**
+ * A smoother travel step than directionToward: fully resolve the axis with
+ * the larger remaining gap first (ignoring sub-deadband wobble), then the
+ * other. This walks a clean L-shaped path instead of staircasing every tick
+ * toward a diagonal target, so AI otters read as deliberate, not frantic.
+ * Returns null when both axes are within the deadband (arrived).
+ */
+export function stepToward(from: Vec2, to: Vec2, deadband = AI_AXIS_DEADBAND): Direction | null {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const adx = Math.abs(dx);
+  const ady = Math.abs(dy);
+  // Fixed priority: resolve the horizontal axis fully, THEN the vertical.
+  // Committing to one axis at a time yields a clean L-path (~1 turn per leg)
+  // instead of staircasing (a turn almost every tick) toward diagonal targets.
+  if (adx > deadband) return dx >= 0 ? 'right' : 'left';
+  if (ady > deadband) return dy >= 0 ? 'down' : 'up';
+  return null;
+}
+
 /** Nearest ground (heldBy===null) build-material item, or null if none exist. */
 function nearestFreeMaterial(state: GameState, from: Vec2): ItemState | null {
   let best: ItemState | null = null;
@@ -79,7 +106,10 @@ export function planOtterCommands(state: GameState, otterId: string): Command[] 
       if (dist(otter.pos, state.dam.site) <= BUILD_RADIUS) {
         return [{ type: 'stop', playerId: otterId }, { type: 'build', playerId: otterId }];
       }
-      return [{ type: 'move', playerId: otterId, dir: directionToward(otter.pos, state.dam.site) }];
+      const toDam = stepToward(otter.pos, state.dam.site);
+      return toDam === null
+        ? [{ type: 'stop', playerId: otterId }]
+        : [{ type: 'move', playerId: otterId, dir: toDam }];
     }
     // Carrying a non-material (e.g. a fish): it can't build the dam, so drop
     // it and free our paws to grab a branch next tick. (design choice)
@@ -98,7 +128,10 @@ export function planOtterCommands(state: GameState, otterId: string): Command[] 
       { type: 'pickUp', playerId: otterId, itemId: target.id },
     ];
   }
-  return [{ type: 'move', playerId: otterId, dir: directionToward(otter.pos, target.pos) }];
+  const toItem = stepToward(otter.pos, target.pos);
+  return toItem === null
+    ? [{ type: 'stop', playerId: otterId }]
+    : [{ type: 'move', playerId: otterId, dir: toItem }];
 }
 
 /**

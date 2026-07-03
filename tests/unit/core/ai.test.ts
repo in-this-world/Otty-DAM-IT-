@@ -4,7 +4,13 @@
  * through the real reduce() loop until a solo round is won before the flood.
  */
 import { describe, expect, it } from 'vitest';
-import { directionToward, planOtterCommands, recommendedAiCount } from '../../../src/core/ai';
+import {
+  AI_AXIS_DEADBAND,
+  directionToward,
+  planOtterCommands,
+  recommendedAiCount,
+  stepToward,
+} from '../../../src/core/ai';
 import { BUILD_RADIUS } from '../../../src/core/dam';
 import { createInitialState } from '../../../src/core/state';
 import { reduce } from '../../../src/core/tick';
@@ -192,5 +198,19 @@ describe('AI acceptance (headline)', () => {
     }
     expect(s.phase).toBe('won');
     expect(s.timerMs).toBeGreaterThan(0);
+  });
+});
+
+describe('stepToward (smooth L-path, P2-05 tuning)', () => {
+  it('resolves the horizontal axis fully before the vertical (one turn per leg)', () => {
+    // far on both axes -> horizontal first
+    expect(stepToward({ x: 0, y: 0 }, { x: 100, y: 100 })).toBe('right');
+    // horizontal already aligned (within deadband) -> switch to vertical
+    expect(stepToward({ x: 95, y: 0 }, { x: 100, y: 100 })).toBe('down');
+    expect(stepToward({ x: 100, y: 100 }, { x: 100, y: 0 })).toBe('up');
+    expect(stepToward({ x: 100, y: 0 }, { x: 0, y: 0 })).toBe('left');
+  });
+  it('returns null once within the deadband on both axes (arrived)', () => {
+    expect(stepToward({ x: 0, y: 0 }, { x: AI_AXIS_DEADBAND - 1, y: AI_AXIS_DEADBAND - 1 })).toBeNull();
   });
 });

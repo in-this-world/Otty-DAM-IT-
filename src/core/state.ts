@@ -32,6 +32,12 @@ export interface GameConfig {
   readonly items?: readonly { readonly id: string; readonly type: ItemType; readonly pos: Vec2 }[];
   /** Water zones (P2-03). Otters inside float and wash off debuffs. */
   readonly water?: readonly Rect[];
+  /**
+   * Per-otter movement-speed override (world units/sec). Otters not listed
+   * fall back to DEFAULT_OTTER_SPEED_PER_SEC. Lets the game slow AI otters
+   * down so they don't zip around (P2-05 tuning).
+   */
+  readonly speedByOtter?: Readonly<Record<string, number>>;
 }
 
 export const DEFAULT_TIMER_MS = 240_000;
@@ -66,7 +72,7 @@ export function createInitialState(config: GameConfig): GameState {
       vel: { x: 0, y: 0 },
       action: 'idle',
       carrying: null,
-      speedPerSec: DEFAULT_OTTER_SPEED_PER_SEC,
+      speedPerSec: config.speedByOtter?.[id] ?? DEFAULT_OTTER_SPEED_PER_SEC,
       stunnedMs: 0,
       speedBoostMs: 0,
       invulnMs: 0,
