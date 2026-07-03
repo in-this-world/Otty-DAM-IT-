@@ -20,7 +20,7 @@ declare global {
 }
 
 test('game round starts and __otty exposes a live, consistent sim state', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?ai=0');
   // Boot -> Game handoff
   await page.waitForFunction(() => window.__otty?.ready === true, undefined, { timeout: 15_000 });
   await page.waitForFunction(() => (window.__otty?.tick ?? 0) > 0, undefined, {
@@ -42,7 +42,7 @@ test('game round starts and __otty exposes a live, consistent sim state', async 
 });
 
 test('keyboard input reaches the core (otter moves right)', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?ai=0');
   await page.waitForFunction(() => (window.__otty as Otty | undefined)?.ready === true);
   await page.waitForFunction(() => ((window.__otty as Otty | undefined)?.tick ?? 0) > 0);
 

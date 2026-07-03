@@ -3,11 +3,13 @@ import {
   parseGameParams,
   REQUIRED_MAX,
   REQUIRED_MIN,
+  AI_MAX,
+  AI_MIN,
   TIMER_MAX_MS,
   TIMER_MIN_MS,
 } from '../../../src/game/params';
 
-const DEFAULTS = { seed: null, freeze: false, timer: null, required: null };
+const DEFAULTS = { seed: null, freeze: false, timer: null, required: null, ai: null };
 
 describe('game/params (E2E test hooks)', () => {
   it('parses seed and freeze', () => {
@@ -52,6 +54,16 @@ describe('game/params (E2E test hooks)', () => {
       freeze: false,
       timer: 120_000,
       required: 3,
+      ai: null,
     });
+  });
+
+  it('parses ai count and clamps to 0..8 (P2-05 wiring)', () => {
+    expect(parseGameParams('?ai=2')).toEqual({ ...DEFAULTS, ai: 2 });
+    expect(parseGameParams('?ai=0').ai).toBe(AI_MIN);
+    expect(parseGameParams('?ai=99').ai).toBe(AI_MAX);
+    expect(parseGameParams('?ai=-3').ai).toBe(AI_MIN);
+    expect(parseGameParams('?ai=lots').ai).toBeNull();
+    expect(parseGameParams('').ai).toBeNull();
   });
 });

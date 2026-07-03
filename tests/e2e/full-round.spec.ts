@@ -229,7 +229,7 @@ test.describe('P1-08 full round', () => {
 
     // seed=1: deterministic layout; required=3: 3 deliveries to win;
     // timer=120000: cannot lose within the bot budget.
-    await page.goto('/?seed=1&required=3&timer=120000');
+    await page.goto('/?seed=1&required=3&timer=120000&ai=0');
     await waitForRoundStart(page);
 
     const opening = await readOtty(page);
@@ -253,7 +253,7 @@ test.describe('P1-08 full round', () => {
   });
 
   test('LOSE: untouched round floods when the timer expires', async ({ page }) => {
-    await page.goto('/?seed=1&timer=3000');
+    await page.goto('/?seed=1&timer=3000&ai=0');
     await waitForRoundStart(page);
 
     await page.waitForFunction(
