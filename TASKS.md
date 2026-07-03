@@ -2,6 +2,9 @@
 
 > 任務板。狀態:`ready`(可認領)/ `blocked`(依賴未完)/ `in_progress` / `done`。
 > 認領:填 owner + 日期。超過 24h 未更新可接手。驗收條件 = 測試,先寫測試再實作。
+> **每組功能開 feature branch(如 `feat/P2-props`);測試全綠才併回 `main`。**
+> **每個任務完成必留一份 `Docs/<任務ID>_summary.md` 摘要**(做了什麼/決策/測試結果/後續注意)。
+> **E2E 現可由 agent 直接在 sandbox 用瀏覽器 MCP 執行(MCP 已修好)。**
 
 ## P0 地基
 
@@ -32,7 +35,7 @@
 | ID | 泳道 | 角色 | 任務 | 依賴 | 驗收條件 | 狀態 | Owner |
 |---|---|---|---|---|---|---|---|
 | P2-01 | A | Developer | 道具全套:魚(吃=加速/丟=暈眩)、石頭(重)、三角錐(帽)、挖土+坑 | P1-02 | 每道具 unit 覆蓋效果與約束 | ready |  \4
-| P2-02 | A | Developer | 戳人 D:掉物資 + 2s 無敵幀 | P2-01 | unit:被戳掉落、無敵期免疫 | blocked | |
+| P2-02 | A | Developer | 戳人 D:掉物資 + 2s 無敵幀 | P2-01 | unit:被戳掉落、無敵期免疫 | done | Claude 2026-07-02 \4
 | P2-03 | A | Developer | 漂浮 F + 手牽手水獺筏、洗澡去 debuff | P1-01 | unit:入水漂浮、連結成串速度加成 | ready |  \4
 | P2-04 | A | Developer | 突發事件:老鷹(影子預警/三角錐免疫)、熊(丟魚引開),狀態機 | P2-01 | unit:事件狀態機全路徑 | blocked | |
 | P2-05 | A | Developer | AI 水獺:補位行為樹(撿→搬→建),人數平衡 | P1-03 | unit:AI 一人局可在時限內完壩(模擬 tick) | ready |  \4
