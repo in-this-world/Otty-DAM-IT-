@@ -5,11 +5,13 @@ import {
   REQUIRED_MIN,
   AI_MAX,
   AI_MIN,
+  AI_SPEED_MAX,
+  AI_SPEED_MIN,
   TIMER_MAX_MS,
   TIMER_MIN_MS,
 } from '../../../src/game/params';
 
-const DEFAULTS = { seed: null, freeze: false, timer: null, required: null, ai: null };
+const DEFAULTS = { seed: null, freeze: false, timer: null, required: null, ai: null, aiSpeed: null };
 
 describe('game/params (E2E test hooks)', () => {
   it('parses seed and freeze', () => {
@@ -55,6 +57,7 @@ describe('game/params (E2E test hooks)', () => {
       timer: 120_000,
       required: 3,
       ai: null,
+      aiSpeed: null,
     });
   });
 
@@ -65,5 +68,13 @@ describe('game/params (E2E test hooks)', () => {
     expect(parseGameParams('?ai=-3').ai).toBe(AI_MIN);
     expect(parseGameParams('?ai=lots').ai).toBeNull();
     expect(parseGameParams('').ai).toBeNull();
+  });
+
+  it('parses aiSpeed percent and clamps to 10..100 (P2-05 slow-down)', () => {
+    expect(parseGameParams('?aiSpeed=55')).toEqual({ ...DEFAULTS, aiSpeed: 55 });
+    expect(parseGameParams('?aiSpeed=5').aiSpeed).toBe(AI_SPEED_MIN);
+    expect(parseGameParams('?aiSpeed=250').aiSpeed).toBe(AI_SPEED_MAX);
+    expect(parseGameParams('?aiSpeed=slow').aiSpeed).toBeNull();
+    expect(parseGameParams('').aiSpeed).toBeNull();
   });
 });

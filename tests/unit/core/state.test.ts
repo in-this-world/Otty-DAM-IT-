@@ -3,6 +3,7 @@ import {
   createInitialState,
   DEFAULT_DAM_REQUIRED_PER_PLAYER,
   DEFAULT_TIMER_MS,
+  DEFAULT_OTTER_SPEED_PER_SEC,
   DEFAULT_WORLD,
 } from '../../../src/core/state';
 import { requiredProgress } from '../../../src/core/dam';
@@ -77,5 +78,16 @@ describe('core/state createInitialState', () => {
   it('clamps playerCount to the supported 1..10 range', () => {
     expect(Object.keys(createInitialState({ playerCount: 0, seed: 1 }).otters)).toHaveLength(1);
     expect(Object.keys(createInitialState({ playerCount: 99, seed: 1 }).otters)).toHaveLength(10);
+  });
+
+  it('applies speedByOtter overrides and defaults the rest (P2-05 slow-down)', () => {
+    const s = createInitialState({
+      playerCount: 3,
+      seed: 42,
+      speedByOtter: { 'otter-2': 110, 'otter-3': 90 },
+    });
+    expect(s.otters['otter-1']?.speedPerSec).toBe(DEFAULT_OTTER_SPEED_PER_SEC);
+    expect(s.otters['otter-2']?.speedPerSec).toBe(110);
+    expect(s.otters['otter-3']?.speedPerSec).toBe(90);
   });
 });

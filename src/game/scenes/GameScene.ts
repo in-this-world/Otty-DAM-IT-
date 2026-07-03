@@ -9,6 +9,7 @@
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
 import { planOtterCommands, recommendedAiCount } from '../../core/ai';
+import { DEFAULT_OTTER_SPEED_PER_SEC } from '../../core/state';
 import type { GameState } from '../../core/types';
 import { animationKeyForAction } from '../anim/registry';
 import { deriveCommands, INITIAL_TRACKER, snapshotFromCodes, type InputTracker } from '../input';
@@ -23,6 +24,8 @@ const OTTER_DISPLAY_HEIGHT = 96;
 /** Local solo play spawns AI teammates to fill out a small party (P2-05). */
 const HUMAN_COUNT = 1;
 const DEFAULT_PARTY_SIZE = 3;
+/** AI otters move at this %% of normal speed by default (?aiSpeed overrides). */
+const DEFAULT_AI_SPEED_PCT = 55;
 /** Placeholder water zone (P2-03): float + raft + wash-off debuff. Real
  *  level layout arrives with P2-08/P4 art. */
 const WATER = [{ x: 40, y: 372, width: 250, height: 140 }] as const;
@@ -53,11 +56,20 @@ export class GameScene extends Phaser.Scene {
     // AI teammates fill the party for single-machine play; ?ai=N overrides
     // (E2E pins ?ai=0 for a deterministic single-otter round).
     const aiCount = params.ai ?? recommendedAiCount(HUMAN_COUNT, DEFAULT_PARTY_SIZE);
+    // AI otters move slower than the human so they don't zip around; ?aiSpeed
+    // (percent of normal) tunes it.
+    const aiSpeedPct = params.aiSpeed ?? DEFAULT_AI_SPEED_PCT;
+    const aiSpeed = Math.round((DEFAULT_OTTER_SPEED_PER_SEC * aiSpeedPct) / 100);
+    const speedByOtter: Record<string, number> = {};
+    for (let i = HUMAN_COUNT + 1; i <= HUMAN_COUNT + aiCount; i++) {
+      speedByOtter[`otter-${i}`] = aiSpeed;
+    }
     this.adapter = new LocalAdapter({
       playerCount: HUMAN_COUNT + aiCount,
       seed: params.seed ?? (Date.now() % 0xffffffff) >>> 0,
       world: WORLD,
       water: WATER,
+      speedByOtter,
       timerMs: params.timer ?? 180_000,
       // E2E hook (?required=N): shrink the win condition so a full
       // win round fits inside a test budget. Omitted -> core default.
