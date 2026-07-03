@@ -8,6 +8,7 @@
  */
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
+import { planOtterCommands, recommendedAiCount } from '../../core/ai';
 import type { GameState } from '../../core/types';
 import { animationKeyForAction } from '../anim/registry';
 import { deriveCommands, INITIAL_TRACKER, snapshotFromCodes, type InputTracker } from '../input';
@@ -19,6 +20,12 @@ import { OTTER_TEXTURE } from './BootScene';
 const PLAYER_ID = 'otter-1';
 const WORLD = { width: 960, height: 540 };
 const OTTER_DISPLAY_HEIGHT = 96;
+/** Local solo play spawns AI teammates to fill out a small party (P2-05). */
+const HUMAN_COUNT = 1;
+const DEFAULT_PARTY_SIZE = 3;
+/** Placeholder water zone (P2-03): float + raft + wash-off debuff. Real
+ *  level layout arrives with P2-08/P4 art. */
+const WATER = [{ x: 40, y: 372, width: 250, height: 140 }] as const;
 
 export class GameScene extends Phaser.Scene {
   private adapter!: GameAdapter;
@@ -43,10 +50,14 @@ export class GameScene extends Phaser.Scene {
 
   create(): void {
     const params = parseGameParams(window.location.search);
+    // AI teammates fill the party for single-machine play; ?ai=N overrides
+    // (E2E pins ?ai=0 for a deterministic single-otter round).
+    const aiCount = params.ai ?? recommendedAiCount(HUMAN_COUNT, DEFAULT_PARTY_SIZE);
     this.adapter = new LocalAdapter({
-      playerCount: 1,
+      playerCount: HUMAN_COUNT + aiCount,
       seed: params.seed ?? (Date.now() % 0xffffffff) >>> 0,
       world: WORLD,
+      water: WATER,
       timerMs: params.timer ?? 180_000,
       // E2E hook (?required=N): shrink the win condition so a full
       // win round fits inside a test budget. Omitted -> core default.
@@ -54,12 +65,14 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.cameras.main.setBackgroundColor('#2d6a7a');
+    this.createWater();
     this.createDam();
     this.createHud();
 
     this.unsubscribe = this.adapter.onState((state) => {
       this.latest = state;
       publishSnapshot(state);
+      this.driveAi(state);
     });
 
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
@@ -142,6 +155,25 @@ export class GameScene extends Phaser.Scene {
       if (!seen.has(id) && state.items[id] === undefined) {
         dot.destroy();
         this.itemDots.delete(id);
+      }
+    }
+  }
+
+  /** P2-03: render placeholder water zones (otters float + form rafts here). */
+  private createWater(): void {
+    for (const w of WATER) {
+      this.add
+        .rectangle(w.x + w.width / 2, w.y + w.height / 2, w.width, w.height, 0x2f8fb0, 0.55)
+        .setStrokeStyle(2, 0x8fdcef);
+    }
+  }
+
+  /** P2-05: every non-player otter is AI — feed the planner's commands in. */
+  private driveAi(state: GameState): void {
+    for (const otter of Object.values(state.otters)) {
+      if (otter.id === PLAYER_ID) continue;
+      for (const command of planOtterCommands(state, otter.id)) {
+        this.adapter.sendCommand(command);
       }
     }
   }
