@@ -69,6 +69,7 @@ export function createInitialState(config: GameConfig): GameState {
       speedPerSec: DEFAULT_OTTER_SPEED_PER_SEC,
       stunnedMs: 0,
       speedBoostMs: 0,
+      invulnMs: 0,
       hat: null,
       wantsBuild: false,
       score: 0,

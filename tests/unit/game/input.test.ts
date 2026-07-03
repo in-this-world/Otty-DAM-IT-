@@ -63,3 +63,16 @@ describe('game/input (P1-05)', () => {
     expect(r.commands).toEqual([]);
   });
 });
+
+describe('game/input poke (P2-02)', () => {
+  const P = 'otter-1';
+  it('maps KeyF to poke and edge-triggers one command per press', () => {
+    expect(snapshotFromCodes(new Set(['KeyF'])).poke).toBe(true);
+    let r = deriveCommands(INITIAL_TRACKER, { ...EMPTY_SNAPSHOT, poke: true }, P, false);
+    expect(r.commands).toEqual([{ type: 'poke', playerId: P }]);
+    r = deriveCommands(r.tracker, { ...EMPTY_SNAPSHOT, poke: true }, P, false);
+    expect(r.commands).toEqual([]); // held, no repeat
+    r = deriveCommands(r.tracker, EMPTY_SNAPSHOT, P, false);
+    expect(r.commands).toEqual([]);
+  });
+});

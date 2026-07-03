@@ -17,6 +17,7 @@ import { floatSystem } from './float';
 import { applyDrop, applyPickUp } from './inventory';
 import { applyDig, applyThrow, applyUseItem } from './items';
 import { applyMove, applyStop, isDirection, movementSystem } from './movement';
+import { applyPoke } from './poke';
 import { timerSystem } from './timer';
 import type { Command, CommandType, GameEvent, GameState } from './types';
 
@@ -124,8 +125,7 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
       return applyStop(state, otter);
     }
     case 'poke': {
-      events.push({ type: 'otterPoked', attackerId: command.playerId, targetId: null });
-      return state; // P2-02: hit detection, stun, item/hat knock-off
+      return applyPoke(state, otter, events);
     }
     case 'build': {
       events.push({ type: 'buildAttempted', playerId: command.playerId });
