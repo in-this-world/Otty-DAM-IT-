@@ -8,11 +8,12 @@
  * Pipeline per tick:
  *   1. advance tick counter
  *   2. apply queued commands in order (validation -> events)
- *   3. run systems (movement -> effects -> dam -> timer)
+ *   3. run systems (movement -> float -> effects -> dam -> timer)
  *   4. emit tickCompleted
  */
 import { damSystem, applyBuild } from './dam';
 import { effectsSystem } from './effects';
+import { floatSystem } from './float';
 import { applyDrop, applyPickUp } from './inventory';
 import { applyDig, applyThrow, applyUseItem } from './items';
 import { applyMove, applyStop, isDirection, movementSystem } from './movement';
@@ -34,6 +35,7 @@ export type System = (state: GameState, dtMs: number, events: GameEvent[]) => Ga
  */
 export const defaultSystems: readonly System[] = [
   movementSystem,
+  floatSystem,
   effectsSystem,
   damSystem,
   timerSystem,
