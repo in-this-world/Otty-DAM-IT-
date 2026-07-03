@@ -32,3 +32,13 @@ linux 基準 `tests/e2e/__screenshots__/smoke.spec.ts/boot-screen-linux.png`
 
 ## 相關
 STATE.md「已知問題」E2E 首跑條目;MASTER_PLAN §5.1 P0 exit、P0-02/P0-05。
+
+## 結果(2026-07-03)
+- self-heal 步驟在 CI 首跑觸發成功:`--update-snapshots` 產出 `boot-screen-linux.png`,
+  bot 提交並 push 回 main(commit `9387485`)。**基準已在 main。**
+- 唯一雜訊:GitHub 對「重跑舊 commit(attempt #2)」再次觸發此步驟,想 push 重複基準 →
+  被 non-fast-forward 擋掉並讓該 run 報錯。屬預期噪音(重跑的是尚無基準的舊 SHA)。
+- **強化**:push 前先 `git pull --rebase --autostash origin main`;基準已在 main 時
+  rebase 讓提交變 no-op,push 競態不再讓 job 硬性失敗(改為 `::warning::`)。
+- 注意:self-heal 用 `GITHUB_TOKEN` 的 push **不會**觸發新的 workflow(GitHub 防遞迴),
+  所以綠燈確認 run 需由一次一般 push 觸發(本強化 commit 即可)。

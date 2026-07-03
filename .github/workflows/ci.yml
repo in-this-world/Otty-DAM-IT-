@@ -45,15 +45,21 @@ jobs:
         if: failure() && github.ref == 'refs/heads/main'
         run: |
           npx playwright test --update-snapshots
-          if [[ -n "$(git status --porcelain tests/e2e/__screenshots__)" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tests/e2e/__screenshots__
-            git commit -m "test(e2e): add CI-generated linux visual baselines"
-            git push origin HEAD:main
-          else
-            echo "No new/changed baselines to commit."
+          if [[ -z "$(git status --porcelain tests/e2e/__screenshots__)" ]]; then
+            echo "No new/changed baselines to commit."; exit 0
           fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tests/e2e/__screenshots__
+          git commit -m "test(e2e): add CI-generated linux visual baselines [skip ci]"
+          # main can advance between checkout and push (a concurrent run, or a
+          # re-run of an older commit). Rebase onto the latest tip first; if the
+          # baseline already landed there this drops our commit as a no-op. Never
+          # fail the job on a push race - the baseline landing once is enough.
+          git pull --rebase --autostash origin main \
+            || { echo "::warning::baseline already on origin/main; nothing to push"; exit 0; }
+          git push origin HEAD:main \
+            || echo "::warning::push rejected; baseline likely already on origin/main"
       - name: Upload Playwright report and results
         if: failure()
         uses: actions/upload-artifact@v4
