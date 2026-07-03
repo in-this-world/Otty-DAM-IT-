@@ -11,6 +11,7 @@ import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/ada
 import type { GameState } from '../../core/types';
 import { animationKeyForAction } from '../anim/registry';
 import { deriveCommands, INITIAL_TRACKER, snapshotFromCodes, type InputTracker } from '../input';
+import { parseGameParams } from '../params';
 import { publishSnapshot } from '../snapshot';
 import { formatTime, progressRatio } from './ui/format';
 import { OTTER_TEXTURE } from './BootScene';
@@ -41,9 +42,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    const params = parseGameParams(window.location.search);
     this.adapter = new LocalAdapter({
       playerCount: 1,
-      seed: (Date.now() % 0xffffffff) >>> 0,
+      seed: params.seed ?? (Date.now() % 0xffffffff) >>> 0,
       world: WORLD,
       timerMs: 180_000,
     });
@@ -66,7 +68,12 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keyup', (e: KeyboardEvent) => this.codesDown.delete(e.code));
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
 
-    this.adapter.start();
+    if (params.freeze) {
+      // deterministic screenshot mode: sim clock off, animations frozen
+      this.anims.pauseAll();
+    } else {
+      this.adapter.start();
+    }
     this.latest = this.adapter.getState();
     publishSnapshot(this.latest);
   }

@@ -25,7 +25,9 @@ test('game boots, exposes __otty.ready, and matches visual baseline', async ({ p
   const pageErrors: string[] = [];
   page.on('pageerror', (err) => pageErrors.push(err.message));
 
-  await page.goto('/');
+  // seed+freeze: deterministic branch layout, sim clock off, anims paused —
+  // the only way a canvas screenshot can be a stable visual baseline.
+  await page.goto('/?seed=1&freeze=1');
 
   // Wait for the game's readiness flag rather than sleeping.
   await page.waitForFunction(
@@ -46,7 +48,8 @@ test('game boots, exposes __otty.ready, and matches visual baseline', async ({ p
   // No uncaught errors during boot.
   expect(pageErrors, `uncaught page errors during boot:\n${pageErrors.join('\n')}`).toEqual([]);
 
-  // Give the first rendered frame a beat to settle before the baseline shot.
-  await page.waitForTimeout(500);
+  // Boot hands over to GameScene after ~300ms; wait for the frozen scene's
+  // first frame, then a beat for the canvas to settle.
+  await page.waitForTimeout(900);
   await expect(page).toHaveScreenshot('boot-screen.png');
 });
