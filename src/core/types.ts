@@ -13,6 +13,14 @@ export interface Vec2 {
   readonly y: number;
 }
 
+/** Axis-aligned rectangle in world coordinates (P2-03 water zones). */
+export interface Rect {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
 /** Collectible/usable item kinds (P1-02 inventory, P2 item effects). */
@@ -48,6 +56,10 @@ export interface OtterState {
   readonly wantsBuild: boolean;
   /** Personal contribution (dam progress added), used for flood settlement. */
   readonly score: number;
+  /** True while standing in a water rect (P2-03 漂浮); undefined on land. */
+  readonly floating?: boolean;
+  /** Number of OTHER otters in the same floating raft; 0/undefined when alone (P2-03). */
+  readonly raftLinks?: number;
 }
 
 export interface ItemState {
@@ -101,6 +113,8 @@ export interface GameState {
   readonly pits: readonly PitState[];
   /** Current mulberry32 seed; advance only via rngStep to stay deterministic. */
   readonly rngSeed: number;
+  /** Water zones; otters inside float, form rafts, and wash off debuffs (P2-03). */
+  readonly water?: readonly Rect[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -166,6 +180,10 @@ export type GameEvent =
   | { readonly type: 'damProgressed'; readonly playerId: string; readonly amount: number; readonly progress: number }
   | { readonly type: 'gameWon'; readonly tick: number; readonly scores: Readonly<Record<string, number>> }
   | { readonly type: 'gameLost'; readonly tick: number; readonly scores: Readonly<Record<string, number>> }
+  | { readonly type: 'otterEnteredWater'; readonly playerId: string }
+  | { readonly type: 'otterLeftWater'; readonly playerId: string }
+  | { readonly type: 'debuffWashedOff'; readonly playerId: string }
+  | { readonly type: 'raftFormed'; readonly playerIds: readonly string[] }
   | { readonly type: 'tickCompleted'; readonly tick: number };
 
 export type GameEventType = GameEvent['type'];

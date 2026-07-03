@@ -32,6 +32,16 @@ export const PIT_STUN_MS = 1500;
 /** Grace period during which the digger cannot fall into their own pit, ms. */
 export const PIT_DIGGER_IMMUNE_MS = 2000;
 
+/**
+ * P2-03 raft speed bonus (owned by float.ts conceptually; the multiplier is
+ * applied here because effectiveSpeedPerSec is the single source of truth for
+ * movement). Kept small so a hand-linked raft is a co-op reward, not a
+ * runaway.
+ */
+export const RAFT_SPEED_BONUS_PER_LINK = 0.15;
+/** Cap on the total raft speed multiplier (>= this many links stop helping). */
+export const RAFT_SPEED_BONUS_CAP = 1.6;
+
 type Reject = (reason: string) => void;
 
 const DIR_VECTORS: Readonly<Record<OtterState['facing'], Vec2>> = {
@@ -49,6 +59,10 @@ export function effectiveSpeedPerSec(otter: OtterState): number {
   let speed = otter.speedPerSec;
   if (otter.speedBoostMs > 0) speed *= FISH_SPEED_MULT;
   if (otter.carrying === 'stone') speed *= STONE_CARRY_SPEED_MULT;
+  // P2-03: hand-linked rafts move faster the more otters are chained together.
+  if (otter.raftLinks && otter.raftLinks > 0) {
+    speed *= Math.min(1 + RAFT_SPEED_BONUS_PER_LINK * otter.raftLinks, RAFT_SPEED_BONUS_CAP);
+  }
   return speed;
 }
 

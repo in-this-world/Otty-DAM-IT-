@@ -5,7 +5,7 @@
  */
 import { requiredProgress } from './dam';
 import { rngStep } from './rng';
-import type { GamePhase, GameState, ItemState, ItemType, OtterState, Vec2 } from './types';
+import type { GamePhase, GameState, ItemState, ItemType, OtterState, Rect, Vec2 } from './types';
 
 export interface GameConfig {
   /** Number of otters (players and, later, AI fill-ins). Clamped to 1..10. */
@@ -30,6 +30,8 @@ export interface GameConfig {
    * stones (P2-01; every 8th item is a fish, every 8th-offset-4 a stone).
    */
   readonly items?: readonly { readonly id: string; readonly type: ItemType; readonly pos: Vec2 }[];
+  /** Water zones (P2-03). Otters inside float and wash off debuffs. */
+  readonly water?: readonly Rect[];
 }
 
 export const DEFAULT_TIMER_MS = 240_000;
@@ -70,6 +72,8 @@ export function createInitialState(config: GameConfig): GameState {
       hat: null,
       wantsBuild: false,
       score: 0,
+      floating: false,
+      raftLinks: 0,
     };
   }
 
@@ -111,5 +115,6 @@ export function createInitialState(config: GameConfig): GameState {
     items,
     pits: [],
     rngSeed: seed,
+    water: config.water ?? [],
   };
 }
