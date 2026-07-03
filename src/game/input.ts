@@ -27,6 +27,8 @@ export interface InputSnapshot {
   readonly interact: boolean;
   /** B — build at the dam. */
   readonly build: boolean;
+  /** F — poke a nearby otter (P2-02). */
+  readonly poke: boolean;
 }
 
 export const EMPTY_SNAPSHOT: InputSnapshot = {
@@ -36,6 +38,7 @@ export const EMPTY_SNAPSHOT: InputSnapshot = {
   right: false,
   interact: false,
   build: false,
+  poke: false,
 };
 
 /** KeyboardEvent.code -> logical input. Unknown codes are ignored. */
@@ -51,6 +54,7 @@ const CODE_MAP: Readonly<Record<string, keyof InputSnapshot>> = {
   KeyE: 'interact',
   Space: 'interact',
   KeyB: 'build',
+  KeyF: 'poke',
 };
 
 export function snapshotFromCodes(codes: ReadonlySet<string>): InputSnapshot {
@@ -71,12 +75,14 @@ export interface InputTracker {
   readonly activeDir: Direction | null;
   readonly interactWasDown: boolean;
   readonly buildWasDown: boolean;
+  readonly pokeWasDown: boolean;
 }
 
 export const INITIAL_TRACKER: InputTracker = {
   activeDir: null,
   interactWasDown: false,
   buildWasDown: false,
+  pokeWasDown: false,
 };
 
 /** Tie-break order when several direction keys are held at once. */
@@ -131,12 +137,17 @@ export function deriveCommands(
     commands.push({ type: 'build', playerId });
   }
 
+  if (snapshot.poke && !tracker.pokeWasDown) {
+    commands.push({ type: 'poke', playerId });
+  }
+
   return {
     commands,
     tracker: {
       activeDir: dir,
       interactWasDown: snapshot.interact,
       buildWasDown: snapshot.build,
+      pokeWasDown: snapshot.poke,
     },
   };
 }

@@ -50,6 +50,8 @@ export interface OtterState {
   readonly stunnedMs: number;
   /** Remaining fish speed-boost, in ms (P2-01). While > 0, speed x1.5. */
   readonly speedBoostMs: number;
+  /** Remaining post-poke invulnerability, in ms (P2-02). While > 0, immune to pokes. */
+  readonly invulnMs?: number;
   /** Headgear worn, or null. Cones block the eagle grab (P2-04). */
   readonly hat: HatType | null;
   /** Set by a valid build command; consumed by the dam system each tick (P1-03). */

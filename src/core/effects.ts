@@ -18,18 +18,21 @@ export function effectsSystem(state: GameState, dtMs: number, events: GameEvent[
 
   const idle =
     state.pits.length === 0 &&
-    Object.values(state.otters).every((o) => o.stunnedMs === 0 && o.speedBoostMs === 0);
+    Object.values(state.otters).every(
+      (o) => o.stunnedMs === 0 && o.speedBoostMs === 0 && (o.invulnMs ?? 0) === 0,
+    );
   if (idle) return state;
 
   const otters: Record<string, OtterState> = {};
   for (const [id, o] of Object.entries(state.otters)) {
     otters[id] =
-      o.stunnedMs === 0 && o.speedBoostMs === 0
+      o.stunnedMs === 0 && o.speedBoostMs === 0 && (o.invulnMs ?? 0) === 0
         ? o
         : {
             ...o,
             stunnedMs: Math.max(0, o.stunnedMs - dtMs),
             speedBoostMs: Math.max(0, o.speedBoostMs - dtMs),
+            invulnMs: Math.max(0, (o.invulnMs ?? 0) - dtMs),
           };
   }
 
