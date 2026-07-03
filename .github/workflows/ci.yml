@@ -11,9 +11,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast static + unit gate. Kept separate from e2e so lint/type/unit
-  # failures surface in ~1 min without waiting for browser install,
-  # and both jobs run in parallel.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -29,6 +26,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,10 +41,19 @@ jobs:
         run: npm run e2e
         env:
           CI: 'true'
-      # NOTE (first-run baselines): until linux baselines exist under
-      # tests/e2e/__screenshots__/, toHaveScreenshot fails and writes the
-      # candidate image into test-results/. Download the artifact below,
-      # review the image, commit it as the baseline, and re-run.
+      - name: Generate missing visual baselines and commit (main only)
+        if: failure() && github.ref == 'refs/heads/main'
+        run: |
+          npx playwright test --update-snapshots
+          if [[ -n "$(git status --porcelain tests/e2e/__screenshots__)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tests/e2e/__screenshots__
+            git commit -m "test(e2e): add CI-generated linux visual baselines"
+            git push origin HEAD:main
+          else
+            echo "No new/changed baselines to commit."
+          fi
       - name: Upload Playwright report and results
         if: failure()
         uses: actions/upload-artifact@v4
