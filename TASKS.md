@@ -36,9 +36,9 @@
 |---|---|---|---|---|---|---|---|
 | P2-01 | A | Developer | 道具全套:魚(吃=加速/丟=暈眩)、石頭(重)、三角錐(帽)、挖土+坑 | P1-02 | 每道具 unit 覆蓋效果與約束 | ready |  \4
 | P2-02 | A | Developer | 戳人 D:掉物資 + 2s 無敵幀 | P2-01 | unit:被戳掉落、無敵期免疫 | done | Claude 2026-07-02 \4
-| P2-03 | A | Developer | 漂浮 F + 手牽手水獺筏、洗澡去 debuff | P1-01 | unit:入水漂浮、連結成串速度加成 | ready |  \4
+| P2-03 | A | Developer | 漂浮 F + 手牽手水獺筏、洗澡去 debuff | P1-01 | unit:入水漂浮、連結成串速度加成 | done | Claude 2026-07-03 \4
 | P2-04 | A | Developer | 突發事件:老鷹(影子預警/三角錐免疫)、熊(丟魚引開),狀態機 | P2-01 | unit:事件狀態機全路徑 | blocked | |
-| P2-05 | A | Developer | AI 水獺:補位行為樹(撿→搬→建),人數平衡 | P1-03 | unit:AI 一人局可在時限內完壩(模擬 tick) | ready |  \4
+| P2-05 | A | Developer | AI 水獺:補位行為樹(撿→搬→建),人數平衡 | P1-03 | unit:AI 一人局可在時限內完壩(模擬 tick) | done | Claude 2026-07-03 \4
 | P2-06 | B | Developer | D/E/F 動畫 + 事件演出 + 手機虛擬搖桿雙鍵 | P2-01..04 | E2E:手機 viewport 可完整遊玩 | blocked | |
 | P2-07 | C | Tester | 全機制 E2E 回歸包 + 60fps 效能檢測腳本 | P2-06 | 回歸全綠;效能報告存檔 | blocked | |
 | P2-08 | D | Designer | 缺口資產第一批:樹枝/魚/石頭/三角錐/土塊(規格:RGBA、單幀或 3–4 幀、風格同水獺) | — | 過管線腳本驗證即收 | ready | |

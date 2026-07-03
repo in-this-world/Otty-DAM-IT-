@@ -3,11 +3,12 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-03 · by Claude (wave 5 平行:P2-03 漂浮/水獺筏/洗澡去 debuff + P2-05 AI 水獺行為樹,兩支 feature branch 並行開發、測綠併回 main;`npm run check` 145 測試全過)
 2026-07-03 · by Claude(流程更新:E2E 可在 sandbox 由 agent 跑〔MCP 已修〕、每任務留 `Docs/` 摘要、feature branch → 測綠才併 `main`)
 2026-07-02 · by Claude (wave 4: P0-02 收尾、P2-01 道具、P1-08 完整一局 E2E)
 
 ## 專案現況
-- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:118 測試全過。
+- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:**145 測試全過**(+P2-03 13、+P2-05 14)。**P2-03(漂浮+手牽手水獺筏+洗澡去 debuff)、P2-05(AI 水獺補位行為樹)core 完成。**
 - GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(已 push;**Actions 尚未看到 run,待排查**)。
 - 遊戲可跑:`npm run dev` → Boot(atlas+動畫註冊)→ GameScene:1P + 撒滿樹枝的場地,WASD/方向鍵移動、E/空白鍵撿放、B 建造、180s 倒數、勝負 overlay、R 重開。
 - git repo 已建(main,7 commits,任務 ID 開頭)。**分支策略(新):每組功能開 feature branch(如 `feat/P2-props`),測試全綠才併回 `main`;`main` 永遠保持可玩、綠燈。** **注意:repo 在 sandbox 開發後同步回本資料夾,Windows 端首次使用建議 `git status` 確認(可能有 CRLF 造成的假差異,`git add --renormalize .` 可解)。**
@@ -25,7 +26,8 @@
 0. **開 feature branch 再動工**(如 `feat/e2e-run`);完成且測綠才併回 `main`。任務結束記得補 `Docs/<ID>_summary.md`。
 1. **跑 E2E(`npm run e2e`,預期 5 tests):MCP 已修好,agent 現在可直接在 sandbox 用瀏覽器 MCP 跑**,驗證 P0-02(smoke + HUD)與 P1-08 完整一局 bot(win + lose)。綠了把 P0-02、P1-08 標 done 並補基準截圖。
 2. **CI 排查**(P0-05):repo → Actions tab;若顯示停用 → Settings→Actions→General 開啟;若無 run → push 任一新 commit 觸發。首跑 e2e job 會因缺 linux 基準截圖紅(預期),照 Docs/P0-02_P0-05_summary.md 補基準。
-3. `ready` 可認領:P2-02(戳人,applyStun 已備好)、P2-03(漂浮)、P2-05(AI 水獺)、P2-08(美術缺口第一批,需真人美術)。
+3. `ready` 可認領:P2-03/P2-05 已完成(見 Docs)。剩 P2-08(美術缺口第一批,需真人美術)。**新的 game-layer 接線工作(建議開 P2-06 一併做):**(a) 場地放置 water 區塊 + 演出 float 動畫/水獺筏視覺;(b) 依 `recommendedAiCount(human)` 生成 AI 水獺並每 tick 呼叫 `planOtterCommands`。core 已備好,純接線。
+4. **P2-02 疑點**:TASKS 標 done,但 tick.ts 的 poke handler 仍是 stub(只發 otterPoked、targetId:null,無命中/掉物/無敵幀),`applyStun` 雖已存在。需確認 P2-02 是否真的完成或漏併——見文末待決。
 
 ## Decisions log(跨泳道決策記錄於此)
 - 2026-07-02:採 command→state→events + GameAdapter 介面,單機/連線共用 core(MASTER_PLAN §2.1)
@@ -37,9 +39,18 @@
 - 2026-07-02:URL 測試鉤子 `?seed&freeze&timer&required`(src/game/params.ts),僅供 E2E/除錯。
 - 2026-07-02:P2-01 數值:魚 ×1.5 速 5s、丟魚暈 2s(射程 160/命中 40)、石頭負重 ×0.5 但建造 +3、`noBranch`→`noBuildMaterial`、坑半徑 32/暈 1.5s/挖掘者寬限 2s;開局散布每第 8 個魚、第 8n+4 個石頭。
 
+- 2026-07-03:**P2-03 漂浮/水獺筏**:additive 型別 `Rect`、`OtterState.floating?/raftLinks?`、`GameState.water?`(皆 optional,不破舊測);事件 `otterEnteredWater/otterLeftWater/debuffWashedOff/raftFormed`。`floatSystem` 排在 `movementSystem` 之後(看得到本 tick 落點,筏加成下 tick 生效)。數值:link 半徑 64、每 link +15%、總加成上限 ×1.6(常數放 items.ts,`effectiveSpeedPerSec` 為唯一速度來源)。入水清 `stunnedMs`=0(洗澡去 debuff)。
+- 2026-07-03:**P2-05 AI 水獺**:純「外部控制器」設計——`planOtterCommands(state, otterId): Command[]` 無狀態(replay/server 安全),餵進既有 `reduce()`,不改任何現有檔、不動型別。行為樹:暈→停;持建材→近壩則 build、否則朝壩移動;持魚→drop;空手→最近自由建材,近則 pickUp、否則靠近;無建材→stop。附 `recommendedAiCount(human,target=4)`。solo AI 用 seed 7 於時限內完壩(驗收綠)。**尚未接進遊戲迴圈**(game-layer 工作)。
+
 ## 已知問題 / 注意
 - Assets 檔名含中文與空格,管線腳本處理路徑要加引號
 - 幀規格不一(627² ×4 vs 724² ×3),管線已支援兩種網格
 - **E2E 待首跑**:先前 sandbox 裝不了 Playwright 瀏覽器(CDN 被擋);**MCP 已修好,agent 現可在 sandbox 用瀏覽器 MCP 直接跑 E2E**,首跑後補 linux 基準截圖
 - Vite build 有 >500KB chunk 警告(Phaser 本體),P4 再做 code-split;首載預算屆時驗證
 - 去背管線:羽化邊緣無 matte decontamination、固定 tolerance 26(詳 Docs/P0-03_summary.md)
+
+## 待決 / 給 boss 的問題(2026-07-03 wave 5)
+1. **P2-02(戳人)狀態不一致**:TASKS.md 標 `done`,但 `src/core/tick.ts` 的 `poke` case 仍是 stub(TODO 註解、targetId:null、無命中/掉物資/2s 無敵幀),而 `applyStun` 已具備。是先前做了未併、還是誤標?要我補完 P2-02(命中偵測+掉物+無敵幀 + 測試)嗎?
+2. **P2-03/P2-05 game-layer 接線**:core 已完成且測綠,但尚未接進 Phaser/遊戲迴圈(場地放 water 區、生成 AI 水獺並每 tick 呼叫 planner)。要我接著做(可併入 P2-06),還是等美術/場地決定?
+3. **E2E 首跑**:本 wave 以 `npm run check`(145 綠)+ 正式 `vite build` 成功作為回歸驗證;完整 Playwright 瀏覽器 E2E 仍待首跑補 linux 基準截圖(既有待辦,未動)。要我下個 session 用瀏覽器 MCP 首跑嗎?
+4. **CRLF/handoff**:本 wave 在 sandbox 開發,已用 `git bundle`(repo.bundle)交回。Windows 端請 `git pull .\repo.bundle main` 快轉;若出現 CRLF 假差異,`git add --renormalize .`。
