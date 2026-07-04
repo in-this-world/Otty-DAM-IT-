@@ -30,7 +30,7 @@ export type ItemType = 'branch' | 'fish' | 'stone' | 'cone' | 'dirt';
 export type HatType = 'cone';
 
 /** Why an otter got stunned (drives distinct SFX/anim in the game layer). */
-export type StunCause = 'thrownFish' | 'pit' | 'poke';
+export type StunCause = 'thrownFish' | 'pit' | 'poke' | 'bear';
 
 /** One value per spritesheet action (MASTER_PLAN §3.1). */
 export type OtterAction = 'idle' | 'walk' | 'carry' | 'poke' | 'eat' | 'float' | 'build';
@@ -92,6 +92,61 @@ export interface PitState {
   readonly diggerImmuneMs: number;
 }
 
+/* ------------------------------------------------------------------ */
+/* P2-04 突發事件 (sudden events): eagle + bear, each a small state    */
+/* machine advanced once per tick by hazardSystem (see hazards.ts).    */
+
+/** Which hazard a scheduled spawn / active hazard is. */
+export type HazardKind = 'eagle' | 'bear';
+
+/**
+ * 🦅 Eagle. Casts a shadow warning over a marked otter for a few seconds,
+ * then swoops: if the target is protected (wears a cone) or dodging (in
+ * water) it comes up empty; otherwise it snatches the item from their paws.
+ * Machine: 'warning' -> 'swoop' -> (removed).
+ */
+export interface EagleState {
+  readonly phase: 'warning' | 'swoop';
+  /** Otter marked at spawn; the swoop resolves against this id. */
+  readonly targetId: string | null;
+  /** Shadow / bird position (tracks the target during 'warning'). */
+  readonly pos: Vec2;
+  /** Remaining time in the current phase, ms. */
+  readonly timerMs: number;
+}
+
+/**
+ * 🐻 Bear. Walks in from the forest edge toward the nearest ground fish
+ * (the lure) or, if none, the nearest otter. Contact knocks an otter flying
+ * (drop + stun). Reaching a fish eats it and lures the bear away.
+ * Machine: 'approach' -> 'leaving' -> (removed).
+ */
+export interface BearState {
+  readonly phase: 'approach' | 'leaving';
+  readonly pos: Vec2;
+  /** Otter being charged (approach) — recomputed each tick. */
+  readonly targetOtterId: string | null;
+  /** Ground fish being lured toward, if any (takes priority over otters). */
+  readonly targetItemId: string | null;
+  /** Remaining lifetime (approach) or walk-off time (leaving), ms. */
+  readonly timerMs: number;
+}
+
+/** A pending hazard spawn: fire when timerMs has counted down to atTimerMs. */
+export interface HazardSpawn {
+  readonly kind: HazardKind;
+  /** Round-timer threshold (ms remaining) at/under which this spawns. */
+  readonly atTimerMs: number;
+}
+
+/** All hazard state on the GameState (P2-04). Absent when hazards are off. */
+export interface HazardsState {
+  readonly eagle: EagleState | null;
+  readonly bear: BearState | null;
+  /** Not-yet-fired spawns, ascending by time-of-round (descending atTimerMs). */
+  readonly schedule: readonly HazardSpawn[];
+}
+
 export type GamePhase = 'lobby' | 'playing' | 'won' | 'lost';
 
 export interface DamState {
@@ -123,6 +178,8 @@ export interface GameState {
   readonly rngSeed: number;
   /** Water zones; otters inside float, form rafts, and wash off debuffs (P2-03). */
   readonly water?: readonly Rect[];
+  /** Sudden-event hazards (P2-04). Absent/undefined when hazards are disabled. */
+  readonly hazards?: HazardsState;
 }
 
 /* ------------------------------------------------------------------ */
@@ -194,6 +251,22 @@ export type GameEvent =
   | { readonly type: 'otterLeftWater'; readonly playerId: string }
   | { readonly type: 'debuffWashedOff'; readonly playerId: string }
   | { readonly type: 'raftFormed'; readonly playerIds: readonly string[] }
+  | { readonly type: 'eagleWarning'; readonly targetId: string | null; readonly pos: Vec2 }
+  | {
+      readonly type: 'eagleSwooped';
+      readonly targetId: string | null;
+      /** Item snatched, or null when the otter was immune/dodging/empty-handed. */
+      readonly itemId: string | null;
+      readonly grabbed: boolean;
+    }
+  | { readonly type: 'bearAppeared'; readonly pos: Vec2 }
+  | {
+      readonly type: 'bearHitOtter';
+      readonly playerId: string;
+      readonly droppedItemId: string | null;
+    }
+  | { readonly type: 'bearLured'; readonly itemId: string }
+  | { readonly type: 'bearLeft' }
   | { readonly type: 'tickCompleted'; readonly tick: number };
 
 export type GameEventType = GameEvent['type'];

@@ -5,7 +5,18 @@
  */
 import { requiredProgress } from './dam';
 import { rngStep } from './rng';
-import type { GamePhase, GameState, ItemState, ItemType, OtterState, Rect, Vec2 } from './types';
+import type {
+  GamePhase,
+  GameState,
+  HazardKind,
+  HazardsState,
+  HazardSpawn,
+  ItemState,
+  ItemType,
+  OtterState,
+  Rect,
+  Vec2,
+} from './types';
 
 export interface GameConfig {
   /** Number of otters (players and, later, AI fill-ins). Clamped to 1..10. */
@@ -38,6 +49,18 @@ export interface GameConfig {
    * down so they don't zip around (P2-05 tuning).
    */
   readonly speedByOtter?: Readonly<Record<string, number>>;
+  /**
+   * Sudden-event hazards (P2-04 老鷹/熊). Omitted => no hazards (default; keeps
+   * existing rounds/tests unchanged). `enabled` schedules a random 1-2 events;
+   * `schedule` pins exact spawns (kind + ms elapsed into the round) for tests
+   * and scripted scenarios.
+   */
+  readonly hazards?: {
+    readonly enabled?: boolean;
+    /** How many random events when `enabled` and no explicit schedule (1-2). */
+    readonly count?: number;
+    readonly schedule?: readonly { readonly kind: HazardKind; readonly atElapsedMs: number }[];
+  };
 }
 
 export const DEFAULT_TIMER_MS = 240_000;
@@ -115,10 +138,38 @@ export function createInitialState(config: GameConfig): GameState {
     }
   }
 
+  const timerMs = config.timerMs ?? DEFAULT_TIMER_MS;
+
+  // P2-04: build the hazard schedule (deterministic from the seed).
+  let hazards: HazardsState | undefined;
+  if (config.hazards) {
+    const spawns: HazardSpawn[] = [];
+    if (config.hazards.schedule) {
+      for (const sp of config.hazards.schedule) {
+        spawns.push({ kind: sp.kind, atTimerMs: timerMs - sp.atElapsedMs });
+      }
+    } else if (config.hazards.enabled) {
+      // Random 1-2 events in the middle 60% of the round; kinds from the seed.
+      const rc = rngStep(seed);
+      seed = rc.nextSeed;
+      const count = Math.max(1, Math.min(4, config.hazards.count ?? (rc.value < 0.5 ? 1 : 2)));
+      for (let i = 0; i < count; i++) {
+        const rt = rngStep(seed);
+        const rk = rngStep(rt.nextSeed);
+        seed = rk.nextSeed;
+        const atElapsedMs = Math.round(timerMs * (0.2 + 0.6 * rt.value));
+        spawns.push({ kind: rk.value < 0.5 ? 'eagle' : 'bear', atTimerMs: timerMs - atElapsedMs });
+      }
+    }
+    // Fire earliest-in-round first: descending atTimerMs.
+    spawns.sort((a, b) => b.atTimerMs - a.atTimerMs);
+    hazards = { eagle: null, bear: null, schedule: spawns };
+  }
+
   return {
     tick: 0,
     phase: config.phase ?? 'playing',
-    timerMs: config.timerMs ?? DEFAULT_TIMER_MS,
+    timerMs,
     dam: { progress: 0, required, site: damSite },
     otters,
     world: { width: world.width, height: world.height },
@@ -126,5 +177,6 @@ export function createInitialState(config: GameConfig): GameState {
     pits: [],
     rngSeed: seed,
     water: config.water ?? [],
+    ...(hazards ? { hazards } : {}),
   };
 }
