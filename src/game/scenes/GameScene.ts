@@ -12,10 +12,17 @@ import { planOtterCommands, recommendedAiCount } from '../../core/ai';
 import { DEFAULT_OTTER_SPEED_PER_SEC } from '../../core/state';
 import type { GameState } from '../../core/types';
 import { animationKeyForAction } from '../anim/registry';
-import { deriveCommands, INITIAL_TRACKER, snapshotFromCodes, type InputTracker } from '../input';
+import {
+  deriveCommands,
+  INITIAL_TRACKER,
+  mergeSnapshots,
+  snapshotFromCodes,
+  type InputTracker,
+} from '../input';
 import { parseGameParams } from '../params';
 import { publishSnapshot } from '../snapshot';
 import { formatTime, progressRatio } from './ui/format';
+import { MobileControls } from './ui/MobileControls';
 import { OTTER_TEXTURE } from './BootScene';
 
 const PLAYER_ID = 'otter-1';
@@ -47,6 +54,14 @@ export class GameScene extends Phaser.Scene {
   private hudTimer!: Phaser.GameObjects.Text;
   private overlay: Phaser.GameObjects.Container | null = null;
 
+  private mobileControls!: MobileControls;
+  private showMobile = false;
+  // P2-06 hazard placeholders (real art: P2-08/09).
+  private eagleShadow: Phaser.GameObjects.Ellipse | null = null;
+  private eagleBird: Phaser.GameObjects.Arc | null = null;
+  private bearBody: Phaser.GameObjects.Arc | null = null;
+  private bearLabel: Phaser.GameObjects.Text | null = null;
+
   constructor() {
     super('Game');
   }
@@ -74,12 +89,20 @@ export class GameScene extends Phaser.Scene {
       // E2E hook (?required=N): shrink the win condition so a full
       // win round fits inside a test budget. Omitted -> core default.
       ...(params.required !== null ? { damRequiredPerPlayer: params.required } : {}),
+      // P2-06: eagle/bear sudden events. On by default; ?hazards=0 disables
+      // them (E2E determinism / stable screenshots).
+      ...(params.hazards ? { hazards: { enabled: true } } : {}),
     });
 
     this.cameras.main.setBackgroundColor('#2d6a7a');
     this.createWater();
     this.createDam();
     this.createHud();
+
+    // P2-06 mobile controls: show on touch devices or a narrow viewport.
+    this.mobileControls = new MobileControls(this);
+    const touch = this.sys.game.device.input.touch;
+    this.showMobile = touch || window.innerWidth < 820;
 
     this.unsubscribe = this.adapter.onState((state) => {
       this.latest = state;
@@ -112,9 +135,13 @@ export class GameScene extends Phaser.Scene {
 
     // input -> commands (pure mapping, unit-tested)
     const me = state.otters[PLAYER_ID];
+    const snapshot = mergeSnapshots(
+      snapshotFromCodes(this.codesDown),
+      this.mobileControls.snapshot(),
+    );
     const { commands, tracker } = deriveCommands(
       this.tracker,
-      snapshotFromCodes(this.codesDown),
+      snapshot,
       PLAYER_ID,
       (me?.carrying ?? null) !== null,
     );
@@ -123,8 +150,10 @@ export class GameScene extends Phaser.Scene {
 
     this.renderOtters(state);
     this.renderItems(state);
+    this.renderHazards(state);
     this.renderDamAndHud(state);
     this.renderOverlay(state);
+    this.mobileControls.setVisible(this.showMobile && state.phase === 'playing');
   }
 
   /* ------------------------------ rendering ------------------------------ */
@@ -227,7 +256,13 @@ export class GameScene extends Phaser.Scene {
     if (state.phase === 'playing' || this.overlay) return;
     const won = state.phase === 'won';
     const title = won ? '水壩完工!全員獲勝 🎉' : '洪水來了……下次加油!';
-    const box = this.add.rectangle(480, 270, 560, 200, 0x00304a, 0.92).setStrokeStyle(2, 0xffffff);
+    const box = this.add
+      .rectangle(480, 270, 560, 200, 0x00304a, 0.92)
+      .setStrokeStyle(2, 0xffffff)
+      .setInteractive({ useHandCursor: true });
+    box.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      if (this.latest && this.latest.phase !== 'playing') this.restart();
+    });
     const t1 = this.add
       .text(480, 240, title, { fontSize: '30px', color: won ? '#62d96b' : '#ff8080' })
       .setOrigin(0.5);
@@ -237,6 +272,36 @@ export class GameScene extends Phaser.Scene {
     this.overlay = this.add.container(0, 0, [box, t1, t2]);
   }
 
+  /** P2-06: draw placeholder eagle (shadow + bird) and bear from state.hazards. */
+  private renderHazards(state: GameState): void {
+    const eagle = state.hazards?.eagle ?? null;
+    if (eagle) {
+      const { x, y } = eagle.pos;
+      const warning = eagle.phase === 'warning';
+      if (!this.eagleShadow) this.eagleShadow = this.add.ellipse(x, y, 64, 28, 0x000000, 0.35);
+      this.eagleShadow.setPosition(x, y).setVisible(true).setAlpha(warning ? 0.35 : 0.5);
+      if (!this.eagleBird) this.eagleBird = this.add.circle(x, y, 16, 0x3a2c22);
+      // bird hovers high during the warning, then dives onto the target
+      this.eagleBird.setPosition(x, y - (warning ? 110 : 14)).setVisible(true);
+    } else {
+      this.eagleShadow?.setVisible(false);
+      this.eagleBird?.setVisible(false);
+    }
+
+    const bear = state.hazards?.bear ?? null;
+    if (bear) {
+      const { x, y } = bear.pos;
+      if (!this.bearBody) this.bearBody = this.add.circle(x, y, 22, 0x6b4a2b).setStrokeStyle(2, 0x3a2617);
+      this.bearBody.setPosition(x, y).setVisible(true);
+      if (!this.bearLabel)
+        this.bearLabel = this.add.text(x, y, '熊', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
+      this.bearLabel.setPosition(x, y).setVisible(true);
+    } else {
+      this.bearBody?.setVisible(false);
+      this.bearLabel?.setVisible(false);
+    }
+  }
+
   /* ------------------------------ lifecycle ------------------------------ */
 
   private restart(): void {
@@ -244,6 +309,9 @@ export class GameScene extends Phaser.Scene {
     this.otterSprites.clear();
     this.itemDots.clear();
     this.overlay = null;
+    this.eagleShadow = this.eagleBird = null;
+    this.bearBody = null;
+    this.bearLabel = null;
     this.tracker = INITIAL_TRACKER;
     this.scene.restart();
   }
@@ -251,6 +319,7 @@ export class GameScene extends Phaser.Scene {
   private teardown(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.mobileControls?.destroy();
     this.adapter.stop();
   }
 }

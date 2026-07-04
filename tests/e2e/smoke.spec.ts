@@ -27,7 +27,7 @@ test('game boots, exposes __otty.ready, and matches visual baseline', async ({ p
 
   // seed+freeze: deterministic branch layout, sim clock off, anims paused —
   // the only way a canvas screenshot can be a stable visual baseline.
-  await page.goto('/?seed=1&freeze=1&ai=0');
+  await page.goto('/?seed=1&freeze=1&ai=0&hazards=0');
 
   // Wait for the game's readiness flag rather than sleeping.
   await page.waitForFunction(
