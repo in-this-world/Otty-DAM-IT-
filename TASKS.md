@@ -66,4 +66,6 @@
 
 ## Bug / 待決事項
 
-(空 — 發現 bug 開 `BUG-xx` 列於此,附重現步驟與失敗測試)
+- BUG-01 建造姿勢卡住(build/poke/eat 永久停在該姿勢直到移動)→ **已修**(transientActionSystem+actionMs,wave 8)
+- BUG-02 F 戳不到隊友(POKE_RADIUS 56 太小)→ **已修**(→90,wave 8)
+- FEAT 游泳改為按鍵 hold-to-swim(C)→ **已做**(wave 8);原自動入水漂浮已改為需按住 C

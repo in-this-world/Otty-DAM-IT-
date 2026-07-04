@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-03 · by Claude (wave 8 實機修正:hold-to-swim〔按 C〕、戳人半徑 56→90、建造/戳/吃姿勢不再卡住〔transientActionSystem+actionMs〕。連線 Chrome 實測:遊戲正常、AI 慢速平滑、完整一局獲勝。`npm run check` 166 綠 + build 綠)
 2026-07-03 · by Claude (wave 7:AI 調校——路徑平滑〔stepToward,換向 ~200→~55〕+ 可調慢 AI〔speedByOtter + ?aiSpeed,預設 55%=110u/s〕;headless playtest 找 bug;Playwright 瀏覽器於 sandbox 不可跑〔CDN 擋+無 root+無連線 Chrome〕。`npm run check` 159 綠 + build 綠)
 2026-07-03 · by Claude (wave 6:P2-02 戳人〔命中+掉物+2s 無敵幀+F 鍵〕真正實作;P2-03 water + P2-05 AI 接進 GameScene 遊戲迴圈〔?ai=N,預設補 2 隻〕;`npm run check` 155 測試全過、`vite build` 綠)
 2026-07-03 · by Claude (wave 5 平行:P2-03 漂浮/水獺筏/洗澡去 debuff + P2-05 AI 水獺行為樹,兩支 feature branch 並行開發、測綠併回 main;`npm run check` 145 測試全過)
@@ -10,7 +11,7 @@
 2026-07-02 · by Claude (wave 4: P0-02 收尾、P2-01 道具、P1-08 完整一局 E2E)
 
 ## 專案現況
-- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:**159 測試全過**。**P2-02(戳人)真正實作完成;P2-03(漂浮/水獺筏/洗澡)、P2-05(AI 水獺補位)已接進 GameScene 遊戲迴圈。**
+- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:**166 測試全過**。**P2-02(戳人)真正實作完成;P2-03(漂浮/水獺筏/洗澡)、P2-05(AI 水獺補位)已接進 GameScene 遊戲迴圈。**
 - GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(已 push;**Actions 尚未看到 run,待排查**)。
 - 遊戲可跑:`npm run dev` → Boot(atlas+動畫註冊)→ GameScene:1P + 撒滿樹枝的場地,WASD/方向鍵移動、E/空白鍵撿放、B 建造、180s 倒數、勝負 overlay、R 重開。
 - git repo 已建(main,7 commits,任務 ID 開頭)。**分支策略(新):每組功能開 feature branch(如 `feat/P2-props`),測試全綠才併回 `main`;`main` 永遠保持可玩、綠燈。** **注意:repo 在 sandbox 開發後同步回本資料夾,Windows 端首次使用建議 `git status` 確認(可能有 CRLF 造成的假差異,`git add --renormalize .` 可解)。**
@@ -49,6 +50,9 @@
 - 2026-07-03:**P2-03/P2-05 接線**:GameScene 傳 `water`(佔位 `{40,372,250,140}`)給 adapter;`driveAi` 每 tick 對非玩家水獺呼叫 `planOtterCommands` 回灌 adapter。AI 數 = `?ai ?? recommendedAiCount(1,3)`=2;`?ai=N`(0..8)覆寫,E2E 全 pin `ai=0`。AI 判定=id≠PLAYER_ID(不進 core 型別)。
 
 - 2026-07-03:**P2-05 AI 調校**:`ai.ts` 新增 `stepToward`(固定先水平後垂直 + `AI_AXIS_DEADBAND=16`)取代 dominant-axis,消除斜向樓梯抖動(換向 ~200→~55)。可調慢:core 泛用 `GameConfig.speedByOtter`;`?aiSpeed=%`(10..100),GameScene 預設 `DEFAULT_AI_SPEED_PCT=55`(AI 110u/s,人類 200 一半)。playtest 驗證仍能於時限內完壩。
+
+- 2026-07-03:**實機三修**:(1) hold-to-swim——入水+按住 C 才漂浮(`wantsSwim`+`swim/stopSwim` 指令,`floatSystem` 加閘);AI 不按 C 故不漂浮。(2) `POKE_RADIUS` 56→90(立繪約 96px,原太小戳空)。(3) 暫態姿勢(build/poke/eat)加 `actionMs`(350ms)+`transientActionSystem` 自動回 idle/carry,修「B 建造卡住要移動才復原」。
+- 2026-07-03:**實機驗證(Chrome MCP)**:127.0.0.1(非 localhost,受 Chrome 政策)、`npm run dev -- --host 127.0.0.1`(vite Windows 綁 IPv6);Phaser 於**隱藏分頁**會凍結整個 loop(rAF 暫停)——分頁需前景可見才會跑,單機遊玩切走會暫停(P3 伺服器端不受影響)。
 
 ## 已知問題 / 注意
 - Assets 檔名含中文與空格,管線腳本處理路徑要加引號
