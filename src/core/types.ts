@@ -58,8 +58,10 @@ export interface OtterState {
   readonly wantsBuild: boolean;
   /** Swim intent (P2-03): hold-to-swim. Float only applies in water while true. */
   readonly wantsSwim?: boolean;
-  /** Remaining hold time for a transient pose (build/poke/eat), ms (P2 fix). */
+  /** Remaining hold time for a transient pose (poke/eat), ms (P2 fix). */
   readonly actionMs?: number;
+  /** Remaining build-channel time, ms (>0 while building; P2-06 build channel). */
+  readonly buildingMs?: number;
   /** Personal contribution (dam progress added), used for flood settlement. */
   readonly score: number;
   /** True while standing in a water rect (P2-03 漂浮); undefined on land. */

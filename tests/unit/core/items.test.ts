@@ -50,6 +50,20 @@ function run(s: GameState, commands: readonly Command[]) {
   return reduce(s, commands, TICK_MS);
 }
 
+/** Start a build then run idle ticks until the channel lands (build is a channel). */
+function buildChannel(s: GameState): { state: GameState; events: import('../../../src/core/types').GameEvent[] } {
+  const events: import('../../../src/core/types').GameEvent[] = [];
+  let r = run(s, [{ type: 'build', playerId: 'otter-1' }]);
+  s = r.state;
+  events.push(...r.events);
+  for (let i = 0; i < 40 && s.dam.progress === 0 && s.phase === 'playing'; i++) {
+    r = run(s, []);
+    s = r.state;
+    events.push(...r.events);
+  }
+  return { state: s, events };
+}
+
 /* ------------------------------------------------------------------ */
 
 describe('fish: eat (useItem)', () => {
@@ -242,7 +256,7 @@ describe('stone: heavy but worth more dam progress', () => {
     let s = setup([{ id: 's1', type: 'stone', pos: { x: 500, y: 120 } }]);
     s = placeOtter(s, 'otter-1', 500, 120); // dam site is (500, 96)
     ({ state: s } = run(s, [{ type: 'pickUp', playerId: 'otter-1' }]));
-    const { state, events } = run(s, [{ type: 'build', playerId: 'otter-1' }]);
+    const { state, events } = buildChannel(s);
     expect(state.dam.progress).toBe(3);
     expect(state.otters['otter-1']?.carrying).toBeNull();
     expect(state.items['s1']).toBeUndefined();
@@ -371,7 +385,7 @@ describe('dirt: dig command and pits', () => {
     ({ state: s } = run(s, [{ type: 'dig', playerId: 'otter-1' }]));
     ({ state: s } = run(s, [{ type: 'pickUp', playerId: 'otter-1' }]));
     expect(otter(s, 'otter-1').carrying).toBe('dirt');
-    const { state } = run(s, [{ type: 'build', playerId: 'otter-1' }]);
+    const { state } = buildChannel(s);
     expect(state.dam.progress).toBe(1);
   });
 

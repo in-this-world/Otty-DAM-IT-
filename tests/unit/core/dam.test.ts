@@ -3,6 +3,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  BUILD_CHANNEL_MS,
   BUILD_RADIUS,
   coopMultiplier,
   damSystem,
@@ -37,6 +38,18 @@ function atDam(playerCount: number, itemsNearDam: number): GameState {
   return { ...s, otters };
 }
 
+/** Run idle ticks until the dam progresses or the round ends (build is now a channel). */
+function runChannel(s: GameState, maxTicks = 40): { state: GameState; events: import('../../../src/core/types').GameEvent[] } {
+  const start = s.dam.progress;
+  const events: import('../../../src/core/types').GameEvent[] = [];
+  for (let i = 0; i < maxTicks && s.dam.progress === start && s.phase === 'playing'; i++) {
+    const r = reduce(s, [], TICK_MS);
+    s = r.state;
+    events.push(...r.events);
+  }
+  return { state: s, events };
+}
+
 describe('core/dam (P1-03)', () => {
   it('requirement curve is sub-linear and exhaustively matches for 1-10 players', () => {
     for (let n = 1; n <= 10; n++) {
@@ -55,17 +68,40 @@ describe('core/dam (P1-03)', () => {
     expect(coopMultiplier(4)).toBe(1.75);
   });
 
-  it('build while carrying a branch near the site adds progress and consumes the branch', () => {
+  it('build is a channel: progress lands only after ~3 anim plays, then consumes the branch', () => {
     let s = atDam(1, 2);
     ({ state: s } = reduce(s, [{ type: 'pickUp', playerId: 'otter-1' }], TICK_MS));
-    const { state, events } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    // start the channel
+    ({ state: s } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS));
+    expect(s.dam.progress).toBe(0); // not applied yet
+    expect(s.otters['otter-1']?.buildingMs).toBe(BUILD_CHANNEL_MS - TICK_MS);
+    expect(s.otters['otter-1']?.action).toBe('build');
+    // ~500ms in, still channeling
+    for (let i = 0; i < 9; i++) ({ state: s } = reduce(s, [], TICK_MS));
+    expect(s.dam.progress).toBe(0);
+    // let the ~1125ms channel finish
+    const { state, events } = runChannel(s);
     expect(state.dam.progress).toBe(1);
     expect(state.otters['otter-1']?.carrying).toBeNull();
     expect(state.otters['otter-1']?.score).toBe(1);
-    expect(Object.keys(state.items)).toHaveLength(1); // b consumed
+    expect(state.otters['otter-1']?.action).toBe('idle'); // not stuck in build pose
+    expect(Object.keys(state.items)).toHaveLength(1);
     expect(events).toContainEqual({
       type: 'damProgressed', playerId: 'otter-1', amount: 1, progress: 1,
     });
+  });
+
+  it('moving cancels the build channel and keeps the material', () => {
+    let s = atDam(1, 2);
+    ({ state: s } = reduce(s, [{ type: 'pickUp', playerId: 'otter-1' }], TICK_MS));
+    ({ state: s } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS));
+    expect(s.otters['otter-1']?.buildingMs).toBeGreaterThan(0);
+    // walk away: cancels
+    ({ state: s } = reduce(s, [{ type: 'move', playerId: 'otter-1', dir: 'down' }], TICK_MS));
+    ({ state: s } = reduce(s, [], TICK_MS));
+    expect(s.otters['otter-1']?.buildingMs ?? 0).toBe(0);
+    expect(s.otters['otter-1']?.carrying).toBe('branch'); // material kept
+    expect(s.dam.progress).toBe(0);
   });
 
   it('two otters building in the same tick each get the 1.25x co-op bonus', () => {
@@ -74,10 +110,12 @@ describe('core/dam (P1-03)', () => {
       { type: 'pickUp', playerId: 'otter-1' },
       { type: 'pickUp', playerId: 'otter-2' },
     ], TICK_MS));
-    const { state } = reduce(s, [
+    ({ state: s } = reduce(s, [
       { type: 'build', playerId: 'otter-1' },
       { type: 'build', playerId: 'otter-2' },
-    ], TICK_MS);
+    ], TICK_MS));
+    // both channels started the same tick -> they complete the same tick -> 1.25x each
+    const { state } = runChannel(s);
     expect(state.dam.progress).toBeCloseTo(2.5);
     expect(state.otters['otter-1']?.score).toBeCloseTo(1.25);
     expect(state.otters['otter-2']?.score).toBeCloseTo(1.25);
@@ -110,7 +148,8 @@ describe('core/dam (P1-03)', () => {
     let s = atDam(1, 25);
     s = { ...s, dam: { ...s.dam, progress: s.dam.required - 0.5 } };
     ({ state: s } = reduce(s, [{ type: 'pickUp', playerId: 'otter-1' }], TICK_MS));
-    const { state, events } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);
+    ({ state: s } = reduce(s, [{ type: 'build', playerId: 'otter-1' }], TICK_MS));
+    const { state, events } = runChannel(s);
     expect(state.dam.progress).toBe(state.dam.required);
     expect(state.phase).toBe('won');
     expect(events.filter((e) => e.type === 'gameWon')).toHaveLength(1);

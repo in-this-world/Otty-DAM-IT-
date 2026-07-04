@@ -110,6 +110,24 @@ describe('float transitions', () => {
     expect(otter(s, 'otter-1').wantsSwim).toBe(false);
   });
 
+  it('keeps floating (float pose) while moving around inside the water', () => {
+    let s = setup();
+    // already swimming in water
+    s = place(s, 'otter-1', 480, 500, { floating: true, action: 'float', wantsSwim: true });
+    s = place(s, 'otter-2', 50, 50);
+    s = place(s, 'otter-3', 900, 50);
+    // simulate movement having set the pose to 'walk' and a velocity, still in water
+    s = place(s, 'otter-1', 500, 500, {
+      floating: true,
+      wantsSwim: true,
+      action: 'walk',
+      vel: { x: 200, y: 0 },
+    });
+    const { state } = runFloat(s);
+    expect(otter(state, 'otter-1').floating).toBe(true);
+    expect(otter(state, 'otter-1').action).toBe('float'); // not cancelled by moving
+  });
+
   it('leaving water clears floating and emits otterLeftWater', () => {
     let s = setup();
     s = place(s, 'otter-1', 500, 500, { floating: true, raftLinks: 0, action: 'float' });
