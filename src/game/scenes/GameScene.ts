@@ -55,7 +55,6 @@ export class GameScene extends Phaser.Scene {
   private overlay: Phaser.GameObjects.Container | null = null;
 
   private mobileControls!: MobileControls;
-  private showMobile = false;
   // P2-06 hazard placeholders (real art: P2-08/09).
   private eagleShadow: Phaser.GameObjects.Ellipse | null = null;
   private eagleBird: Phaser.GameObjects.Arc | null = null;
@@ -99,10 +98,10 @@ export class GameScene extends Phaser.Scene {
     this.createDam();
     this.createHud();
 
-    // P2-06 mobile controls: show on touch devices or a narrow viewport.
+    // P2-06 mobile controls: shown on touch devices or a narrow viewport
+    // (visibility recomputed each frame so rotate/resize toggles it).
     this.mobileControls = new MobileControls(this);
-    const touch = this.sys.game.device.input.touch;
-    this.showMobile = touch || window.innerWidth < 820;
+    this.mobileControls.setVisible(false);
 
     this.unsubscribe = this.adapter.onState((state) => {
       this.latest = state;
@@ -153,7 +152,7 @@ export class GameScene extends Phaser.Scene {
     this.renderHazards(state);
     this.renderDamAndHud(state);
     this.renderOverlay(state);
-    this.mobileControls.setVisible(this.showMobile && state.phase === 'playing');
+    this.mobileControls.setVisible(this.shouldShowMobile() && state.phase === 'playing');
   }
 
   /* ------------------------------ rendering ------------------------------ */
@@ -270,6 +269,11 @@ export class GameScene extends Phaser.Scene {
       .text(480, 300, '按 R 再來一局', { fontSize: '18px', color: '#ffffff' })
       .setOrigin(0.5);
     this.overlay = this.add.container(0, 0, [box, t1, t2]);
+  }
+
+  /** Show mobile controls on touch devices or a narrow viewport (P2-06). */
+  private shouldShowMobile(): boolean {
+    return this.sys.game.device.input.touch || window.innerWidth < 820;
   }
 
   /** P2-06: draw placeholder eagle (shadow + bird) and bear from state.hazards. */

@@ -5,7 +5,7 @@
  *   ?timer=<ms>      override round length, clamped to 1s..10min (P1-08)
  *   ?required=<n>    override damRequiredPerPlayer, clamped to 1..100 (P1-08)
  *   ?ai=<n>          number of AI otters (0..8); default = fill party (P2-05)
-  *   ?aiSpeed=<pct>   AI move speed as %% of normal (10..100); default 55 (P2-05)
+ *   ?aiSpeed=<pct>   AI move speed as %% of normal (10..100); default 55 (P2-05)
  *   ?hazards=0       disable eagle/bear sudden events (E2E determinism); on by default (P2-06)
  * All exist for E2E (stable screenshots / short win-lose rounds); normal
  * play uses none of them.
