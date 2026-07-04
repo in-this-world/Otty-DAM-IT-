@@ -18,6 +18,8 @@ import { applyDrop, applyPickUp } from './inventory';
 import { applyDig, applyThrow, applyUseItem } from './items';
 import { applyMove, applyStop, isDirection, movementSystem } from './movement';
 import { applyPoke } from './poke';
+import { applySwim, applyStopSwim } from './float';
+import { transientActionSystem } from './action';
 import { timerSystem } from './timer';
 import type { Command, CommandType, GameEvent, GameState } from './types';
 
@@ -39,6 +41,7 @@ export const defaultSystems: readonly System[] = [
   floatSystem,
   effectsSystem,
   damSystem,
+  transientActionSystem,
   timerSystem,
 ];
 
@@ -77,6 +80,8 @@ const KNOWN_COMMAND_TYPES: readonly CommandType[] = [
   'dig',
   'poke',
   'build',
+  'swim',
+  'stopSwim',
 ];
 
 /** Commands may arrive from the network (P3), so type is untrusted at runtime. */
@@ -126,6 +131,12 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
     }
     case 'poke': {
       return applyPoke(state, otter, events);
+    }
+    case 'swim': {
+      return applySwim(state, otter);
+    }
+    case 'stopSwim': {
+      return applyStopSwim(state, otter);
     }
     case 'build': {
       events.push({ type: 'buildAttempted', playerId: command.playerId });

@@ -10,10 +10,11 @@
  *
  * Command side only; the invuln timer decays passively in effects.ts.
  */
+import { TRANSIENT_ACTION_HOLD_MS } from './action';
 import type { GameEvent, GameState, ItemState, OtterState } from './types';
 
 /** Reach of a poke, world units. */
-export const POKE_RADIUS = 56;
+export const POKE_RADIUS = 90;
 /** Invulnerability granted to a poked otter, ms (v0.1 §4: 2s 無敵幀). */
 export const POKE_INVULN_MS = 2000;
 
@@ -38,7 +39,7 @@ export function applyPoke(state: GameState, otter: OtterState, events: GameEvent
   }
 
   // The attacker always plays the poke animation, hit or miss.
-  const attacker: OtterState = { ...otter, action: 'poke' };
+  const attacker: OtterState = { ...otter, action: 'poke', actionMs: TRANSIENT_ACTION_HOLD_MS };
   const withAttacker = (s: GameState): GameState => ({
     ...s,
     otters: { ...s.otters, [otter.id]: attacker },

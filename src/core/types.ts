@@ -56,6 +56,10 @@ export interface OtterState {
   readonly hat: HatType | null;
   /** Set by a valid build command; consumed by the dam system each tick (P1-03). */
   readonly wantsBuild: boolean;
+  /** Swim intent (P2-03): hold-to-swim. Float only applies in water while true. */
+  readonly wantsSwim?: boolean;
+  /** Remaining hold time for a transient pose (build/poke/eat), ms (P2 fix). */
+  readonly actionMs?: number;
   /** Personal contribution (dam progress added), used for flood settlement. */
   readonly score: number;
   /** True while standing in a water rect (P2-03 漂浮); undefined on land. */
@@ -136,7 +140,9 @@ export type Command =
   | (CommandBase & { readonly type: 'throwItem' })
   | (CommandBase & { readonly type: 'dig' })
   | (CommandBase & { readonly type: 'poke' })
-  | (CommandBase & { readonly type: 'build' });
+  | (CommandBase & { readonly type: 'build' })
+  | (CommandBase & { readonly type: 'swim' })
+  | (CommandBase & { readonly type: 'stopSwim' });
 
 export type CommandType = Command['type'];
 

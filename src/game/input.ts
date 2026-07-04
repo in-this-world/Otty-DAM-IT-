@@ -29,6 +29,8 @@ export interface InputSnapshot {
   readonly build: boolean;
   /** F — poke a nearby otter (P2-02). */
   readonly poke: boolean;
+  /** C — hold to swim while in water (P2-03). */
+  readonly swim: boolean;
 }
 
 export const EMPTY_SNAPSHOT: InputSnapshot = {
@@ -39,6 +41,7 @@ export const EMPTY_SNAPSHOT: InputSnapshot = {
   interact: false,
   build: false,
   poke: false,
+  swim: false,
 };
 
 /** KeyboardEvent.code -> logical input. Unknown codes are ignored. */
@@ -55,6 +58,7 @@ const CODE_MAP: Readonly<Record<string, keyof InputSnapshot>> = {
   Space: 'interact',
   KeyB: 'build',
   KeyF: 'poke',
+  KeyC: 'swim',
 };
 
 export function snapshotFromCodes(codes: ReadonlySet<string>): InputSnapshot {
@@ -76,6 +80,7 @@ export interface InputTracker {
   readonly interactWasDown: boolean;
   readonly buildWasDown: boolean;
   readonly pokeWasDown: boolean;
+  readonly swimWasDown: boolean;
 }
 
 export const INITIAL_TRACKER: InputTracker = {
@@ -83,6 +88,7 @@ export const INITIAL_TRACKER: InputTracker = {
   interactWasDown: false,
   buildWasDown: false,
   pokeWasDown: false,
+  swimWasDown: false,
 };
 
 /** Tie-break order when several direction keys are held at once. */
@@ -141,6 +147,13 @@ export function deriveCommands(
     commands.push({ type: 'poke', playerId });
   }
 
+  // hold-to-swim: raise on press edge, lower on release edge
+  if (snapshot.swim && !tracker.swimWasDown) {
+    commands.push({ type: 'swim', playerId });
+  } else if (!snapshot.swim && tracker.swimWasDown) {
+    commands.push({ type: 'stopSwim', playerId });
+  }
+
   return {
     commands,
     tracker: {
@@ -148,6 +161,7 @@ export function deriveCommands(
       interactWasDown: snapshot.interact,
       buildWasDown: snapshot.build,
       pokeWasDown: snapshot.poke,
+      swimWasDown: snapshot.swim,
     },
   };
 }

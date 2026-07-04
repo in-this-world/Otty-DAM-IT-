@@ -10,6 +10,8 @@ import { describe, expect, it } from 'vitest';
 import {
   RAFT_LINK_RADIUS,
   RAFT_SPEED_BONUS_PER_LINK,
+  applyStopSwim,
+  applySwim,
   floatSystem,
   isInWater,
 } from '../../../src/core/float';
@@ -29,7 +31,7 @@ function setup(water: readonly Rect[] = [WATER]): GameState {
 function place(s: GameState, id: string, x: number, y: number, patch: Partial<OtterState> = {}): GameState {
   const o = s.otters[id];
   if (!o) throw new Error(`missing otter ${id}`);
-  return { ...s, otters: { ...s.otters, [id]: { ...o, pos: { x, y }, ...patch } } };
+  return { ...s, otters: { ...s.otters, [id]: { ...o, pos: { x, y }, wantsSwim: true, ...patch } } };
 }
 
 function otter(s: GameState, id: string): OtterState {
@@ -74,6 +76,35 @@ describe('float transitions', () => {
     expect(otter(state, 'otter-1').floating).toBe(true);
     expect(otter(state, 'otter-1').action).toBe('float');
     expect(events.some((e) => e.type === 'otterEnteredWater' && e.playerId === 'otter-1')).toBe(true);
+  });
+
+  it('an otter in water WITHOUT swim intent does NOT float (hold-to-swim)', () => {
+    let s = setup();
+    s = place(s, 'otter-1', 500, 500, { wantsSwim: false });
+    s = place(s, 'otter-2', 50, 50);
+    s = place(s, 'otter-3', 900, 50);
+    const { state } = runFloat(s);
+    expect(otter(state, 'otter-1').floating).not.toBe(true);
+    expect(otter(state, 'otter-1').action).not.toBe('float');
+  });
+
+  it('releasing swim intent while in water ends floating next tick', () => {
+    let s = setup();
+    s = place(s, 'otter-1', 500, 500, { floating: true, action: 'float', wantsSwim: true });
+    s = place(s, 'otter-2', 50, 50);
+    s = place(s, 'otter-3', 900, 50);
+    s = applyStopSwim(s, otter(s, 'otter-1'));
+    const { state, events } = runFloat(s);
+    expect(otter(state, 'otter-1').floating).toBe(false);
+    expect(events.some((e) => e.type === 'otterLeftWater' && e.playerId === 'otter-1')).toBe(true);
+  });
+
+  it('applySwim / applyStopSwim toggle the intent flag', () => {
+    let s = setup();
+    s = applySwim(s, otter(s, 'otter-1'));
+    expect(otter(s, 'otter-1').wantsSwim).toBe(true);
+    s = applyStopSwim(s, otter(s, 'otter-1'));
+    expect(otter(s, 'otter-1').wantsSwim).toBe(false);
   });
 
   it('leaving water clears floating and emits otterLeftWater', () => {

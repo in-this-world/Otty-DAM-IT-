@@ -210,7 +210,7 @@ export class GameScene extends Phaser.Scene {
     this.hudTimer = this.add
       .text(WORLD.width - 16, 16, '--:--', { fontSize: '24px', color: '#ffffff' })
       .setOrigin(1, 0);
-    this.add.text(16, 40, 'WASD/方向鍵移動 · E/空白鍵撿放 · B建造 · F戳人', {
+    this.add.text(16, 40, 'WASD/方向鍵移動 · E/空白鍵撿放 · B建造 · F戳人 · C游泳', {
       fontSize: '13px',
       color: '#cfe8ef',
     });
