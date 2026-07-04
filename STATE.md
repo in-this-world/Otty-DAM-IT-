@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-04 · by Claude (wave 12:P2-06 手機操作〔虛擬搖桿+撿放/建/戳/游動作鍵,純 touch.ts + mergeSnapshots 併鍵盤管線,Scale.FIT 塞手機〕、突發事件演出〔老鷹影子/鳥+熊 placeholder 接進 GameScene,?hazards=0 關,snapshot 增 hazards〕、D/E/F 動畫確認。新增 15 測共 201 綠+build 綠;subagent code review=ship;另全站已上 GitHub Pages 自動部署)
 2026-07-04 · by Claude (wave 11:P2-04 突發事件實作——🦅老鷹〔影子預警3s→俯衝叼走手上物資;戴三角錐/水中漂浮免疫〕、🐻熊〔林邊走出,魚優先→吃魚被引開,否則追人拍飛掉物+暈1.5s+擊退;丟魚可引開〕,兩台狀態機 hazards.ts + hazardSystem,決定性排程〔config.hazards,預設關〕。新增 18 測,`npm run check` 186 綠 + build 綠)
 2026-07-04 · by Claude (wave 10:游泳〔C 切換〕水中移動不取消〔以水域為界〕;建造改蓄力通道——動畫播 3 次〔1125ms〕才生效,移動/被戳/離範圍取消。168 綠+build 綠,AI 仍穩贏 83–102s)
 2026-07-03 · by Claude (wave 9:戳人加可見回饋〔擊退+短暈 450ms,cause poke〕、游泳改為按 C 切換〔原 hold〕。166 綠+build 綠)
@@ -14,7 +15,7 @@
 2026-07-02 · by Claude (wave 4: P0-02 收尾、P2-01 道具、P1-08 完整一局 E2E)
 
 ## 專案現況
-- **P0 完成(含本機 E2E 3/3 綠 + win32 基準)、P1 一局可玩、P2-01 道具核心完成。** `npm run check` 綠:**186 測試全過**。**P2-02(戳人)、P2-04(突發事件:老鷹+熊狀態機,core 完成、預設關,待 P2-06 接演出)真正實作完成;P2-03(漂浮/水獺筏/洗澡)、P2-05(AI 水獺補位)已接進 GameScene 遊戲迴圈。**
+- **P0 完成、P1 一局可玩、P2 單機玩法核心齊備。** `npm run check` 綠:**201 測試全過** + `vite build` 綠。**P2-01 道具、P2-02 戳人、P2-03 漂浮/筏/洗澡、P2-04 突發事件(老鷹+熊)、P2-05 AI、P2-06 手機操作+事件演出+D/E/F 動畫 全部完成並接進 GameScene**(hazards 預設開、`?hazards=0` 關)。**自動部署上線:push main → GitHub Actions → GitHub Pages(https://in-this-world.github.io/Otty-DAM-IT-/)。**
 - GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(已 push;**Actions 尚未看到 run,待排查**)。
 - 遊戲可跑:`npm run dev` → Boot(atlas+動畫註冊)→ GameScene:1P + 撒滿樹枝的場地,WASD/方向鍵移動、E/空白鍵撿放、B 建造、180s 倒數、勝負 overlay、R 重開。
 - git repo 已建(main,7 commits,任務 ID 開頭)。**分支策略(新):每組功能開 feature branch(如 `feat/P2-props`),測試全綠才併回 `main`;`main` 永遠保持可玩、綠燈。** **注意:repo 在 sandbox 開發後同步回本資料夾,Windows 端首次使用建議 `git status` 確認(可能有 CRLF 造成的假差異,`git add --renormalize .` 可解)。**

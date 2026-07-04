@@ -59,4 +59,22 @@ describe('game/snapshot (P1-07)', () => {
     expect(heldSnap.items).toEqual([{ id: 'b', x: 30, y: 40, type: 'fish' }]);
     expect(heldSnap.itemsOnGround).toBe(1);
   });
+
+  it('exposes active hazards, or null when off (P2-06)', () => {
+    const base = createInitialState({ playerCount: 1, seed: 1, items: [] });
+    expect(buildSnapshot(base).hazards).toBeNull(); // no hazards config
+
+    const withHazards = {
+      ...base,
+      hazards: {
+        eagle: { phase: 'warning' as const, targetId: 'otter-1', pos: { x: 100, y: 50 }, timerMs: 3000 },
+        bear: null,
+        schedule: [],
+      },
+    };
+    expect(buildSnapshot(withHazards).hazards).toEqual({
+      eagle: { phase: 'warning', x: 100, y: 50 },
+      bear: null,
+    });
+  });
 });

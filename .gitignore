@@ -9,3 +9,6 @@ coverage/
 .gh-token
 .secrets/
 *.pat
+repo.bundle
+*.bundle
+t.txt

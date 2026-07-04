@@ -11,7 +11,15 @@ import {
   TIMER_MIN_MS,
 } from '../../../src/game/params';
 
-const DEFAULTS = { seed: null, freeze: false, timer: null, required: null, ai: null, aiSpeed: null };
+const DEFAULTS = {
+  seed: null,
+  freeze: false,
+  timer: null,
+  required: null,
+  ai: null,
+  aiSpeed: null,
+  hazards: true,
+};
 
 describe('game/params (E2E test hooks)', () => {
   it('parses seed and freeze', () => {
@@ -58,6 +66,7 @@ describe('game/params (E2E test hooks)', () => {
       required: 3,
       ai: null,
       aiSpeed: null,
+      hazards: true,
     });
   });
 
@@ -76,5 +85,12 @@ describe('game/params (E2E test hooks)', () => {
     expect(parseGameParams('?aiSpeed=250').aiSpeed).toBe(AI_SPEED_MAX);
     expect(parseGameParams('?aiSpeed=slow').aiSpeed).toBeNull();
     expect(parseGameParams('').aiSpeed).toBeNull();
+  });
+
+  it('hazards default on; ?hazards=0/false disables (P2-06)', () => {
+    expect(parseGameParams('').hazards).toBe(true);
+    expect(parseGameParams('?hazards=0').hazards).toBe(false);
+    expect(parseGameParams('?hazards=false').hazards).toBe(false);
+    expect(parseGameParams('?hazards=1').hazards).toBe(true);
   });
 });

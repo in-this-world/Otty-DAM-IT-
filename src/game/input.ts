@@ -61,6 +61,27 @@ const CODE_MAP: Readonly<Record<string, keyof InputSnapshot>> = {
   KeyC: 'swim',
 };
 
+/**
+ * OR two input snapshots field-by-field. Lets the mobile touch controls and
+ * the keyboard feed the same `deriveCommands` pipeline (P2-06): a logical
+ * input is "held" if either source has it down.
+ */
+export function mergeSnapshots(
+  a: InputSnapshot,
+  b: Partial<InputSnapshot>,
+): InputSnapshot {
+  return {
+    up: a.up || b.up === true,
+    down: a.down || b.down === true,
+    left: a.left || b.left === true,
+    right: a.right || b.right === true,
+    interact: a.interact || b.interact === true,
+    build: a.build || b.build === true,
+    poke: a.poke || b.poke === true,
+    swim: a.swim || b.swim === true,
+  };
+}
+
 export function snapshotFromCodes(codes: ReadonlySet<string>): InputSnapshot {
   const snapshot = { ...EMPTY_SNAPSHOT } as Record<keyof InputSnapshot, boolean>;
   for (const code of codes) {

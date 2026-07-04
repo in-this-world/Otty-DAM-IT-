@@ -27,6 +27,11 @@ export interface OttySnapshot {
   readonly itemsOnGround: number;
   /** Items currently lying on the ground (held items are excluded). */
   readonly items: readonly SnapshotItem[];
+  /** P2-06: active sudden-event hazards (null when none / disabled). */
+  readonly hazards: {
+    readonly eagle: { readonly phase: 'warning' | 'swoop'; readonly x: number; readonly y: number } | null;
+    readonly bear: { readonly phase: 'approach' | 'leaving'; readonly x: number; readonly y: number } | null;
+  } | null;
 }
 
 export function buildSnapshot(state: GameState): OttySnapshot {
@@ -48,6 +53,16 @@ export function buildSnapshot(state: GameState): OttySnapshot {
     otters,
     itemsOnGround: items.length,
     items,
+    hazards: state.hazards
+      ? {
+          eagle: state.hazards.eagle
+            ? { phase: state.hazards.eagle.phase, x: state.hazards.eagle.pos.x, y: state.hazards.eagle.pos.y }
+            : null,
+          bear: state.hazards.bear
+            ? { phase: state.hazards.bear.phase, x: state.hazards.bear.pos.x, y: state.hazards.bear.pos.y }
+            : null,
+        }
+      : null,
   };
 }
 
