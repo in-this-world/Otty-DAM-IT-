@@ -64,25 +64,26 @@ export function floatSystem(state: GameState, _dtMs: number, events: GameEvent[]
   const floating: OtterState[] = [];
 
   for (const [id, o] of Object.entries(state.otters)) {
-    // Hold-to-swim (P2-03): float only when in water AND swim intent is held.
-    const inWater = isInWater(o.pos, water) && o.wantsSwim === true;
+    // Swim intent is a toggle (P2-03): while it is on AND the otter is in
+    // water it floats — and KEEPS floating while moving around (bound only by
+    // the water area). Toggling off, or leaving the water, ends it.
+    const swimming = isInWater(o.pos, water) && o.wantsSwim === true;
     const wasFloating = o.floating === true;
     let next = o;
 
-    if (inWater && !wasFloating) {
-      // land -> water: start floating, wash off debuffs.
-      const washed = o.stunnedMs > 0;
-      next = {
-        ...o,
-        floating: true,
-        action: o.action === 'idle' || o.action === 'walk' ? 'float' : o.action,
-        stunnedMs: 0,
-      };
-      events.push({ type: 'otterEnteredWater', playerId: id });
-      if (washed) events.push({ type: 'debuffWashedOff', playerId: id });
-      changed = true;
-    } else if (!inWater && wasFloating) {
-      // water -> land: stop floating.
+    if (swimming) {
+      // Hold the float pose every tick (so walking in water doesn't cancel it);
+      // water is also a safe/wash zone (stun cleared).
+      if (o.floating !== true || o.action !== 'float' || o.stunnedMs !== 0) {
+        next = { ...o, floating: true, action: 'float', stunnedMs: 0 };
+        changed = true;
+      }
+      if (!wasFloating) {
+        events.push({ type: 'otterEnteredWater', playerId: id });
+        if (o.stunnedMs > 0) events.push({ type: 'debuffWashedOff', playerId: id });
+      }
+    } else if (wasFloating) {
+      // water -> land, or swim toggled off: stop floating.
       next = {
         ...o,
         floating: false,

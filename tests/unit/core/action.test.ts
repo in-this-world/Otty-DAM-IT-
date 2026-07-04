@@ -15,14 +15,12 @@ function withOtter(s: GameState, patch: Partial<OtterState>): GameState {
 }
 
 describe('transientActionSystem', () => {
-  it('holds a build pose for ~TRANSIENT_ACTION_HOLD_MS then reverts to idle', () => {
+  it('holds a transient pose (poke) for ~TRANSIENT_ACTION_HOLD_MS then reverts to idle', () => {
     let s = createInitialState({ playerCount: 1, seed: 1 });
-    s = withOtter(s, { action: 'build', actionMs: TRANSIENT_ACTION_HOLD_MS, carrying: null });
+    s = withOtter(s, { action: 'poke', actionMs: TRANSIENT_ACTION_HOLD_MS, carrying: null });
     const evs: GameEvent[] = [];
-    // one tick: still holding
     s = transientActionSystem(s, 50, evs);
-    expect(s.otters['otter-1']?.action).toBe('build');
-    // run out the clock
+    expect(s.otters['otter-1']?.action).toBe('poke');
     for (let i = 0; i < 8; i++) s = transientActionSystem(s, 50, evs);
     expect(s.otters['otter-1']?.action).toBe('idle');
   });
@@ -34,7 +32,7 @@ describe('transientActionSystem', () => {
     expect(s.otters['otter-1']?.action).toBe('carry');
   });
 
-  it('a built otter is no longer stuck in the build pose after a few idle ticks (reduce)', () => {
+  it('a built otter ends in idle (not stuck) after the build channel completes (reduce)', () => {
     let s = createInitialState({
       playerCount: 1,
       seed: 1,
@@ -49,8 +47,9 @@ describe('transientActionSystem', () => {
       items: { b1: { id: 'b1', type: 'branch', pos: { x: 480, y: 110 }, heldBy: 'otter-1' } },
     };
     s = reduce(s, [{ type: 'build', playerId: 'otter-1' }], 50).state;
-    expect(s.otters['otter-1']?.action).toBe('build'); // pose right after building
-    for (let i = 0; i < 10; i++) s = reduce(s, [], 50).state; // stand still
-    expect(s.otters['otter-1']?.action).toBe('idle'); // no longer stuck
+    expect(s.otters['otter-1']?.action).toBe('build'); // channel pose
+    for (let i = 0; i < 30 && s.dam.progress === 0; i++) s = reduce(s, [], 50).state;
+    expect(s.dam.progress).toBe(1);
+    expect(s.otters['otter-1']?.action).toBe('idle'); // reverts on completion, not stuck
   });
 });

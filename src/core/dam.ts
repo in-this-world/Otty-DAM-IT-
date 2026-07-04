@@ -13,7 +13,6 @@
  * (builders - 1)). Materials (v0.1 §4.2): branch 1, dirt 1, stone 3.
  * Progress is capped at `required`; reaching it wins the round instantly.
  */
-import { TRANSIENT_ACTION_HOLD_MS } from './action';
 import type { GameEvent, GameState, ItemType, OtterState } from './types';
 
 /** Max distance from dam.site at which building is allowed. */
@@ -31,6 +30,13 @@ export const BUILD_AMOUNTS: Partial<Record<ItemType, number>> = {
 };
 /** Extra multiplier per additional simultaneous builder. */
 export const COOP_BONUS_PER_EXTRA_BUILDER = 0.25;
+/**
+ * Building is a channel: the otter plays the build animation ~3 times
+ * (3 x 375ms) and the progress only lands when the channel completes.
+ * Moving, being poked/stunned, dropping the material, or leaving range
+ * cancels it (the material is kept).
+ */
+export const BUILD_CHANNEL_MS = 1125;
 
 export function requiredProgress(playerCount: number, basePerPlayer: number): number {
   return Math.round(basePerPlayer * Math.pow(playerCount, 0.85));
@@ -44,6 +50,7 @@ type Reject = (reason: string) => void;
 
 /** Command handler: validate and mark intent; resolution happens in damSystem. */
 export function applyBuild(state: GameState, otter: OtterState, reject: Reject): GameState {
+  if ((otter.buildingMs ?? 0) > 0) return state; // already channeling; ignore repeat presses
   if (otter.carrying === null || BUILD_AMOUNTS[otter.carrying] === undefined) {
     reject('noBuildMaterial');
     return state;
@@ -53,9 +60,13 @@ export function applyBuild(state: GameState, otter: OtterState, reject: Reject):
     reject('tooFarFromDam');
     return state;
   }
+  // start the build channel; progress lands when it completes (damSystem).
   return {
     ...state,
-    otters: { ...state.otters, [otter.id]: { ...otter, wantsBuild: true } },
+    otters: {
+      ...state.otters,
+      [otter.id]: { ...otter, buildingMs: BUILD_CHANNEL_MS, action: 'build' },
+    },
   };
 }
 
@@ -66,38 +77,54 @@ export function scoresOf(state: GameState): Record<string, number> {
 }
 
 /** Per-tick system: resolve all pending builds with the co-op bonus. */
-export function damSystem(state: GameState, _dtMs: number, events: GameEvent[]): GameState {
+export function damSystem(state: GameState, dtMs: number, events: GameEvent[]): GameState {
   if (state.phase !== 'playing') return state;
 
-  const builders = Object.values(state.otters).filter((o) => o.wantsBuild);
-  if (builders.length === 0) return state;
+  const channeling = Object.values(state.otters).filter((o) => (o.buildingMs ?? 0) > 0);
+  if (channeling.length === 0) return state;
 
-  const mult = coopMultiplier(builders.length);
   const otters: Record<string, OtterState> = { ...state.otters };
+  const completers: string[] = [];
+
+  // 1. advance or cancel each active build channel this tick.
+  for (const o of channeling) {
+    const hasMaterial = o.carrying !== null && BUILD_AMOUNTS[o.carrying] !== undefined;
+    const inRange =
+      Math.hypot(o.pos.x - state.dam.site.x, o.pos.y - state.dam.site.y) <= BUILD_RADIUS;
+    const moving = o.vel.x !== 0 || o.vel.y !== 0;
+    if (!hasMaterial || !inRange || o.stunnedMs > 0 || moving) {
+      // interrupted -> cancel; the otter keeps its material.
+      otters[o.id] = { ...o, buildingMs: 0, action: o.carrying !== null ? 'carry' : 'idle' };
+      continue;
+    }
+    const remaining = (o.buildingMs ?? 0) - dtMs;
+    if (remaining > 0) {
+      otters[o.id] = { ...o, buildingMs: remaining, action: 'build' };
+    } else {
+      completers.push(o.id);
+    }
+  }
+
+  if (completers.length === 0) return { ...state, otters };
+
+  // 2. apply every channel that finished this tick, sharing the co-op bonus.
+  const mult = coopMultiplier(completers.length);
   const items = { ...state.items };
   let progress = state.dam.progress;
-
-  for (const b of builders) {
+  for (const id of completers) {
+    const b = otters[id];
+    if (!b) continue;
+    if (progress >= state.dam.required) {
+      otters[id] = { ...b, buildingMs: 0, action: b.carrying !== null ? 'carry' : 'idle' };
+      continue;
+    }
     const base = (b.carrying !== null ? BUILD_AMOUNTS[b.carrying] : undefined) ?? 0;
     const amount = Math.min(base * mult, state.dam.required - progress);
     progress += amount;
-    // consume the carried material
-    const held = Object.values(items).find((i) => i.heldBy === b.id);
+    const held = Object.values(items).find((i) => i.heldBy === id);
     if (held) delete items[held.id];
-    otters[b.id] = {
-      ...b,
-      wantsBuild: false,
-      carrying: null,
-      action: 'build',
-      actionMs: TRANSIENT_ACTION_HOLD_MS,
-      score: b.score + amount,
-    };
-    events.push({ type: 'damProgressed', playerId: b.id, amount, progress });
-    if (progress >= state.dam.required) break;
-  }
-  // clear intent on any builder skipped by the early break
-  for (const [id, o] of Object.entries(otters)) {
-    if (o.wantsBuild) otters[id] = { ...o, wantsBuild: false };
+    otters[id] = { ...b, buildingMs: 0, carrying: null, action: 'idle', score: b.score + amount };
+    events.push({ type: 'damProgressed', playerId: id, amount, progress });
   }
 
   const won = progress >= state.dam.required;

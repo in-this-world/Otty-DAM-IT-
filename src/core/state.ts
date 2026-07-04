@@ -80,6 +80,7 @@ export function createInitialState(config: GameConfig): GameState {
       wantsBuild: false,
       wantsSwim: false,
       actionMs: 0,
+      buildingMs: 0,
       score: 0,
       floating: false,
       raftLinks: 0,

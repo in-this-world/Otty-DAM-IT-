@@ -1,5 +1,5 @@
 /**
- * Transient action poses (build / poke / eat) should play briefly and then
+ * Transient action poses (poke / eat) should play briefly and then
  * fall back to idle/carry — otherwise the otter freezes mid-pose until the
  * player happens to move (the "B build is stuck" bug). Each transient action
  * is stamped with `actionMs` when set; this system counts it down and reverts
@@ -10,7 +10,7 @@ import type { GameEvent, GameState, OtterAction, OtterState } from './types';
 /** How long a one-shot pose (build/poke/eat) is held before reverting, ms. */
 export const TRANSIENT_ACTION_HOLD_MS = 350;
 
-const TRANSIENT: ReadonlySet<OtterAction> = new Set<OtterAction>(['build', 'poke', 'eat']);
+const TRANSIENT: ReadonlySet<OtterAction> = new Set<OtterAction>(['poke', 'eat']);
 
 export function transientActionSystem(
   state: GameState,

@@ -31,7 +31,7 @@ describe('core simulation (P1-01..04 wired together)', () => {
 
     const events: GameEvent[] = [];
     let guard = 0;
-    while (s.phase === 'playing' && guard++ < 200) {
+    while (s.phase === 'playing' && guard++ < 800) {
       const r = reduce(
         s,
         [
