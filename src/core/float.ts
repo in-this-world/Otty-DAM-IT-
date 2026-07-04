@@ -64,7 +64,8 @@ export function floatSystem(state: GameState, _dtMs: number, events: GameEvent[]
   const floating: OtterState[] = [];
 
   for (const [id, o] of Object.entries(state.otters)) {
-    const inWater = isInWater(o.pos, water);
+    // Hold-to-swim (P2-03): float only when in water AND swim intent is held.
+    const inWater = isInWater(o.pos, water) && o.wantsSwim === true;
     const wasFloating = o.floating === true;
     let next = o;
 
@@ -148,4 +149,23 @@ function groupComponents(floating: readonly OtterState[]): string[][] {
     groups.set(root, arr);
   }
   return [...groups.values()];
+}
+
+/* ------------------------------------------------------------------ */
+/* swim / stopSwim commands (P2-03 hold-to-swim): toggle the intent flag. */
+
+function withOtter(state: GameState, otter: OtterState): GameState {
+  return { ...state, otters: { ...state.otters, [otter.id]: otter } };
+}
+
+/** swim command: raise the swim-intent flag (hold-to-swim). */
+export function applySwim(state: GameState, otter: OtterState): GameState {
+  if (otter.wantsSwim === true) return state;
+  return withOtter(state, { ...otter, wantsSwim: true });
+}
+
+/** stopSwim command: lower the swim-intent flag; float ends next tick. */
+export function applyStopSwim(state: GameState, otter: OtterState): GameState {
+  if (!otter.wantsSwim) return state;
+  return withOtter(state, { ...otter, wantsSwim: false });
 }

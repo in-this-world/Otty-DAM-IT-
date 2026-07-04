@@ -9,6 +9,7 @@
  *
  * The passive side (buff/stun decay, pit collisions) lives in effects.ts.
  */
+import { TRANSIENT_ACTION_HOLD_MS } from './action';
 import type { GameEvent, GameState, ItemState, OtterState, Vec2 } from './types';
 
 /* Tuning constants (P2-01 owns these numbers; see Docs/P2-01_summary.md). */
@@ -139,6 +140,7 @@ export function applyUseItem(
             ...otter,
             carrying: null,
             action: 'eat',
+            actionMs: TRANSIENT_ACTION_HOLD_MS,
             speedBoostMs: FISH_BOOST_MS,
           },
         },

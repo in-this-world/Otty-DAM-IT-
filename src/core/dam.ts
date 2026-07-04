@@ -13,6 +13,7 @@
  * (builders - 1)). Materials (v0.1 §4.2): branch 1, dirt 1, stone 3.
  * Progress is capped at `required`; reaching it wins the round instantly.
  */
+import { TRANSIENT_ACTION_HOLD_MS } from './action';
 import type { GameEvent, GameState, ItemType, OtterState } from './types';
 
 /** Max distance from dam.site at which building is allowed. */
@@ -88,6 +89,7 @@ export function damSystem(state: GameState, _dtMs: number, events: GameEvent[]):
       wantsBuild: false,
       carrying: null,
       action: 'build',
+      actionMs: TRANSIENT_ACTION_HOLD_MS,
       score: b.score + amount,
     };
     events.push({ type: 'damProgressed', playerId: b.id, amount, progress });

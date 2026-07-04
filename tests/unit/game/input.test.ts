@@ -76,3 +76,16 @@ describe('game/input poke (P2-02)', () => {
     expect(r.commands).toEqual([]);
   });
 });
+
+describe('game/input swim (P2-03 hold-to-swim)', () => {
+  const P = 'otter-1';
+  it('maps KeyC to swim and edge-triggers swim / stopSwim', () => {
+    expect(snapshotFromCodes(new Set(['KeyC'])).swim).toBe(true);
+    let r = deriveCommands(INITIAL_TRACKER, { ...EMPTY_SNAPSHOT, swim: true }, P, false);
+    expect(r.commands).toEqual([{ type: 'swim', playerId: P }]);
+    r = deriveCommands(r.tracker, { ...EMPTY_SNAPSHOT, swim: true }, P, false); // held
+    expect(r.commands).toEqual([]);
+    r = deriveCommands(r.tracker, EMPTY_SNAPSHOT, P, false); // released
+    expect(r.commands).toEqual([{ type: 'stopSwim', playerId: P }]);
+  });
+});
