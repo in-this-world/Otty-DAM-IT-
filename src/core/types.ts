@@ -30,7 +30,7 @@ export type ItemType = 'branch' | 'fish' | 'stone' | 'cone' | 'dirt';
 export type HatType = 'cone';
 
 /** Why an otter got stunned (drives distinct SFX/anim in the game layer). */
-export type StunCause = 'thrownFish' | 'pit';
+export type StunCause = 'thrownFish' | 'pit' | 'poke';
 
 /** One value per spritesheet action (MASTER_PLAN §3.1). */
 export type OtterAction = 'idle' | 'walk' | 'carry' | 'poke' | 'eat' | 'float' | 'build';

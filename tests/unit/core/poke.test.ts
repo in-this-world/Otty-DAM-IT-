@@ -2,7 +2,7 @@
  * P2-02: poke (戳人) — knock an item loose + grant the victim i-frames.
  */
 import { describe, expect, it } from 'vitest';
-import { applyPoke, POKE_INVULN_MS, POKE_RADIUS } from '../../../src/core/poke';
+import { applyPoke, POKE_INVULN_MS, POKE_RADIUS, POKE_STUN_MS } from '../../../src/core/poke';
 import { createInitialState } from '../../../src/core/state';
 import { reduce } from '../../../src/core/tick';
 import type { GameEvent, GameState, OtterState } from '../../../src/core/types';
@@ -53,6 +53,10 @@ describe('P2-02 poke', () => {
     const victim = next.otters['otter-2']!;
     expect(victim.carrying).toBeNull();
     expect(victim.invulnMs).toBe(POKE_INVULN_MS);
+    // brief stagger stun + knockback away from the attacker (visible feedback)
+    expect(victim.stunnedMs).toBeGreaterThanOrEqual(POKE_STUN_MS);
+    expect(victim.pos.x).toBeGreaterThan(100 + POKE_RADIUS - 6); // shoved right, away from attacker at x=100
+    expect(events.some((e) => e.type === 'otterStunned' && e.cause === 'poke')).toBe(true);
     expect(next.otters['otter-1']!.action).toBe('poke');
     const item = next.items['b1']!;
     expect(item.heldBy).toBeNull();

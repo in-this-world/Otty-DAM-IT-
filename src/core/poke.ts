@@ -17,6 +17,17 @@ import type { GameEvent, GameState, ItemState, OtterState } from './types';
 export const POKE_RADIUS = 90;
 /** Invulnerability granted to a poked otter, ms (v0.1 §4: 2s 無敵幀). */
 export const POKE_INVULN_MS = 2000;
+/** Brief stagger stun on a poked otter so the hit is visible, ms. */
+export const POKE_STUN_MS = 450;
+/** How far a poked otter is shoved away from the attacker, world units. */
+export const POKE_KNOCKBACK = 40;
+
+const DIR_VECTORS = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+} as const;
 
 function heldItemOf(
   items: Record<string, ItemState>,
@@ -59,11 +70,12 @@ export function applyPoke(state: GameState, otter: OtterState, events: GameEvent
 
   const otters: Record<string, OtterState> = { ...state.otters, [otter.id]: attacker };
   const items: Record<string, ItemState> = { ...state.items };
+  const origin = target.pos;
 
   if (target.carrying !== null) {
     const held = heldItemOf(items, target.id);
     if (held) {
-      items[held.id] = { ...held, heldBy: null, pos: target.pos };
+      items[held.id] = { ...held, heldBy: null, pos: origin };
       events.push({
         type: 'itemDropped',
         playerId: target.id,
@@ -73,14 +85,34 @@ export function applyPoke(state: GameState, otter: OtterState, events: GameEvent
     }
   }
 
+  // Knockback: shove the victim away from the attacker (clamped to the world).
+  let kx = origin.x - otter.pos.x;
+  let ky = origin.y - otter.pos.y;
+  const len = Math.hypot(kx, ky);
+  if (len === 0) {
+    const v = DIR_VECTORS[otter.facing];
+    kx = v.x;
+    ky = v.y;
+  } else {
+    kx /= len;
+    ky /= len;
+  }
+  const pos = {
+    x: Math.min(state.world.width, Math.max(0, origin.x + kx * POKE_KNOCKBACK)),
+    y: Math.min(state.world.height, Math.max(0, origin.y + ky * POKE_KNOCKBACK)),
+  };
+
   otters[target.id] = {
     ...target,
+    pos,
     carrying: null,
     wantsBuild: false,
+    stunnedMs: Math.max(target.stunnedMs, POKE_STUN_MS),
     invulnMs: POKE_INVULN_MS,
     vel: { x: 0, y: 0 },
     action: 'idle',
   };
+  events.push({ type: 'otterStunned', playerId: target.id, durationMs: POKE_STUN_MS, cause: 'poke' });
 
   return { ...state, otters, items };
 }

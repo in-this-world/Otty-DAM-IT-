@@ -158,10 +158,9 @@ function withOtter(state: GameState, otter: OtterState): GameState {
   return { ...state, otters: { ...state.otters, [otter.id]: otter } };
 }
 
-/** swim command: raise the swim-intent flag (hold-to-swim). */
+/** swim command: TOGGLE the swim-intent flag (press C to start/stop swimming). */
 export function applySwim(state: GameState, otter: OtterState): GameState {
-  if (otter.wantsSwim === true) return state;
-  return withOtter(state, { ...otter, wantsSwim: true });
+  return withOtter(state, { ...otter, wantsSwim: !otter.wantsSwim });
 }
 
 /** stopSwim command: lower the swim-intent flag; float ends next tick. */
