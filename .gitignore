@@ -4,3 +4,8 @@ test-results/
 playwright-report/
 coverage/
 *.log
+
+# local secrets — NEVER commit (holds the GitHub PAT for auto-deploy)
+.gh-token
+.secrets/
+*.pat
