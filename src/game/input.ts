@@ -147,11 +147,9 @@ export function deriveCommands(
     commands.push({ type: 'poke', playerId });
   }
 
-  // hold-to-swim: raise on press edge, lower on release edge
+  // toggle-swim: one command per key press (core flips wantsSwim)
   if (snapshot.swim && !tracker.swimWasDown) {
     commands.push({ type: 'swim', playerId });
-  } else if (!snapshot.swim && tracker.swimWasDown) {
-    commands.push({ type: 'stopSwim', playerId });
   }
 
   return {

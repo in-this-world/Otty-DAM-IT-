@@ -25,3 +25,8 @@
 - 暫態姿勢改為 350ms 後自動回復;若要更長的建造/吃魚演出可調 `TRANSIENT_ACTION_HOLD_MS`。
 - hold-to-swim 讓 AI 不再漂浮;若要 AI 也會游可讓 planner 在需要時送 swim。
 - 實機 keyboard 測試需在**前景可見**的分頁(Phaser 於隱藏分頁會暫停整個迴圈)。
+
+## Follow-up (same day, more play feedback)
+- **Poke felt like nothing happened** even at radius 90: added visible feedback — a poked otter now gets a brief stagger stun (`POKE_STUN_MS=450`) + knockback shove away from the attacker (`POKE_KNOCKBACK=40`, clamped to world), on top of the existing drop + 2s i-frames; emits `otterStunned {cause:'poke'}`. `StunCause` gains `'poke'`.
+- **Swim changed from hold to toggle** (boss preference): press **C** toggles `wantsSwim` (was hold-to-swim). `applySwim` now flips the flag; input fires one command per press; `applyStopSwim` kept as a force-off. Hint → "C游泳(切換)".
+- Tests updated (poke stun/knockback/event, input toggle, float toggle). `npm run check` 166 green + build green.

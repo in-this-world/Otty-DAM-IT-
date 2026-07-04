@@ -99,11 +99,14 @@ describe('float transitions', () => {
     expect(events.some((e) => e.type === 'otterLeftWater' && e.playerId === 'otter-1')).toBe(true);
   });
 
-  it('applySwim / applyStopSwim toggle the intent flag', () => {
+  it('applySwim toggles the intent flag; applyStopSwim forces it off', () => {
     let s = setup();
     s = applySwim(s, otter(s, 'otter-1'));
     expect(otter(s, 'otter-1').wantsSwim).toBe(true);
-    s = applyStopSwim(s, otter(s, 'otter-1'));
+    s = applySwim(s, otter(s, 'otter-1')); // toggle again -> off
+    expect(otter(s, 'otter-1').wantsSwim).toBe(false);
+    s = applySwim(s, otter(s, 'otter-1')); // on
+    s = applyStopSwim(s, otter(s, 'otter-1')); // force off
     expect(otter(s, 'otter-1').wantsSwim).toBe(false);
   });
 
