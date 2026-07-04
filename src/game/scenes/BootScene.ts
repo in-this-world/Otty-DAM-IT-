@@ -14,6 +14,9 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
+    // Anchor relative asset URLs to the Vite base ('/' locally, '/Otty-DAM-IT-/'
+    // on GitHub Pages) so the atlas loads under a project sub-path too (P2-deploy).
+    this.load.setBaseURL(import.meta.env.BASE_URL);
     this.load.atlas(OTTER_TEXTURE, 'assets/otter.png', 'assets/otter.json');
     this.load.json('otter-animations', 'assets/animations.json');
   }
