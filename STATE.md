@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-03 · by Claude (wave 9:戳人加可見回饋〔擊退+短暈 450ms,cause poke〕、游泳改為按 C 切換〔原 hold〕。166 綠+build 綠)
 2026-07-03 · by Claude (wave 8 實機修正:hold-to-swim〔按 C〕、戳人半徑 56→90、建造/戳/吃姿勢不再卡住〔transientActionSystem+actionMs〕。連線 Chrome 實測:遊戲正常、AI 慢速平滑、完整一局獲勝。`npm run check` 166 綠 + build 綠)
 2026-07-03 · by Claude (wave 7:AI 調校——路徑平滑〔stepToward,換向 ~200→~55〕+ 可調慢 AI〔speedByOtter + ?aiSpeed,預設 55%=110u/s〕;headless playtest 找 bug;Playwright 瀏覽器於 sandbox 不可跑〔CDN 擋+無 root+無連線 Chrome〕。`npm run check` 159 綠 + build 綠)
 2026-07-03 · by Claude (wave 6:P2-02 戳人〔命中+掉物+2s 無敵幀+F 鍵〕真正實作;P2-03 water + P2-05 AI 接進 GameScene 遊戲迴圈〔?ai=N,預設補 2 隻〕;`npm run check` 155 測試全過、`vite build` 綠)
