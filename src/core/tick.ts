@@ -14,6 +14,7 @@
 import { damSystem, applyBuild } from './dam';
 import { effectsSystem } from './effects';
 import { floatSystem } from './float';
+import { hazardSystem } from './hazards';
 import { applyDrop, applyPickUp } from './inventory';
 import { applyDig, applyThrow, applyUseItem } from './items';
 import { applyMove, applyStop, isDirection, movementSystem } from './movement';
@@ -40,6 +41,7 @@ export const defaultSystems: readonly System[] = [
   movementSystem,
   floatSystem,
   effectsSystem,
+  hazardSystem,
   damSystem,
   transientActionSystem,
   timerSystem,
