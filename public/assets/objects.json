@@ -1,0 +1,56 @@
+{
+  "objects": {
+    "obj_cone": [
+      "obj_cone_0"
+    ],
+    "obj_wood": [
+      "obj_wood_0",
+      "obj_wood_1",
+      "obj_wood_2",
+      "obj_wood_3"
+    ],
+    "obj_fish": [
+      "obj_fish_0",
+      "obj_fish_1",
+      "obj_fish_2",
+      "obj_fish_3"
+    ],
+    "obj_falling": [
+      "obj_falling_0",
+      "obj_falling_1",
+      "obj_falling_2",
+      "obj_falling_3"
+    ],
+    "obj_stone": [
+      "obj_stone_0",
+      "obj_stone_1",
+      "obj_stone_2",
+      "obj_stone_3"
+    ],
+    "obj_dirt": [
+      "obj_dirt_0"
+    ],
+    "obj_splash": [
+      "obj_splash_0",
+      "obj_splash_1",
+      "obj_splash_2",
+      "obj_splash_3"
+    ],
+    "obj_dam": [
+      "obj_dam_0",
+      "obj_dam_1",
+      "obj_dam_2",
+      "obj_dam_3",
+      "obj_dam_4",
+      "obj_dam_5",
+      "obj_dam_6",
+      "obj_dam_7"
+    ],
+    "obj_star": [
+      "obj_star_0",
+      "obj_star_1",
+      "obj_star_2",
+      "obj_star_3"
+    ]
+  }
+}

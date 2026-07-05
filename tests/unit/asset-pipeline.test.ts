@@ -11,6 +11,7 @@ import sharp from 'sharp';
 import { detectGrid } from '../../scripts/lib/grid';
 import {
   applyColorKey,
+  floodKeyBackground,
   sampleBackgroundColor,
   type RawRGBA,
 } from '../../scripts/lib/colorkey';
@@ -215,5 +216,53 @@ describe('processSheet', () => {
       expect(alphaAt(15, 15)).toBe(0);
       expect(alphaAt(8, 8)).toBeGreaterThan(200);
     }
+  });
+});
+
+describe('floodKeyBackground (border-connected removal)', () => {
+  const W = 24;
+  const H = 24;
+  const bg = { r: 238, g: 238, b: 236 };
+  // Build a raw RGBA image: gray bg everywhere, a dark outline ring enclosing
+  // an interior that is ALSO the bg gray color (e.g. a gray stone / white belly).
+  function stoneImage(): RawRGBA {
+    const data = new Uint8Array(W * H * 4);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const onRing = x >= 6 && x <= 17 && y >= 6 && y <= 17 &&
+          (x === 6 || x === 17 || y === 6 || y === 17);
+        const r = onRing ? 40 : bg.r;
+        const g = onRing ? 40 : bg.g;
+        const b = onRing ? 40 : bg.b;
+        data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = 255;
+      }
+    }
+    return { data, width: W, height: H };
+  }
+
+  const alphaAt = (img: RawRGBA, x: number, y: number) => img.data[(y * W + x) * 4 + 3]!;
+
+  it('keeps a bg-colored interior enclosed by an outline (unlike global key)', () => {
+    const img = stoneImage();
+    const flooded = floodKeyBackground(img, bg, { tolerance: 24, feather: 20 });
+    // corners (outside the ring) become transparent
+    expect(alphaAt(flooded, 0, 0)).toBe(0);
+    expect(alphaAt(flooded, 23, 23)).toBe(0);
+    // interior gray (x12,y12) stays opaque because it is unreachable from border
+    expect(alphaAt(flooded, 12, 12)).toBe(255);
+    // the dark outline itself stays opaque
+    expect(alphaAt(flooded, 6, 12)).toBe(255);
+
+    // contrast: the global color-key erases the interior too (the bug we avoid)
+    const global = applyColorKey(img, bg, { tolerance: 24, feather: 20 });
+    expect(alphaAt(global, 12, 12)).toBe(0);
+  });
+
+  it('does not mutate the input image', () => {
+    const img = stoneImage();
+    const before = Array.from(img.data);
+    floodKeyBackground(img, bg, {});
+    expect(Array.from(img.data)).toEqual(before);
   });
 });

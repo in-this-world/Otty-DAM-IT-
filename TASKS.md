@@ -41,8 +41,8 @@
 | P2-05 | A | Developer | AI 水獺:補位行為樹(撿→搬→建),人數平衡 | P1-03 | unit:AI 一人局可在時限內完壩(模擬 tick) | done | Claude 2026-07-03 \4
 | P2-06 | B | Developer | D/E/F 動畫 + 事件演出 + 手機虛擬搖桿雙鍵 | P2-01..04 | E2E:手機 viewport 可完整遊玩 | done | Claude 2026-07-04 |
 | P2-07 | C | Tester | 全機制 E2E 回歸包 + 60fps 效能檢測腳本 | P2-06 | 回歸全綠;效能報告存檔 | blocked | |
-| P2-08 | D | Designer | 缺口資產第一批:樹枝/魚/石頭/三角錐/土塊(規格:RGBA、單幀或 3–4 幀、風格同水獺) | — | 過管線腳本驗證即收 | ready | |
-| P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | blocked | |
+| P2-08 | D | Designer | 缺口資產第一批:樹枝/魚/石頭/三角錐/土塊(規格:RGBA、單幀或 3–4 幀、風格同水獺) | — | 過管線腳本驗證即收 | done | Claude 2026-07-05(wave2 管線:88 幀/17 anims/9 物件組,203 綠+build 綠) |
+| P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | in_progress | Claude 2026-07-05(老鷹/熊/水壩 8 階段+特效物件 done;僅剩場景 tiles) |
 
 ## P3 連線
 

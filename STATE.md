@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-05 · by Claude (wave 13:第二批美術過管線——新增 11 動作/NPC 動畫〔dizzy/throw/dig/pick_stone/wash/win/lose/eagle/bear/cone_hat〕+ 9 組物件貼圖〔obj_cone/wood/fish/falling/stone/dirt/splash/dam〔8 階段〕/star〕。單一 otter.png 圖集 88 幀 908×1688 ~1.13MB〔遠低於 3MB 預算〕;新增 objects.json 物件清單。管線加 floodKeyBackground〔邊界連通去背〕保住灰/白內部〔石頭/魚肚/泡泡/鷹頭/水壩〕;win 用全域去背化掉卡片底、O 牽手圖有硬邊框故捨棄〔改單漂+連線〕。P2-08 done、P2-09 部分〔剩場景 tiles〕。`npm run check` 203 綠 + build 綠)
 2026-07-04 · by Claude (wave 12:P2-06 手機操作〔虛擬搖桿+撿放/建/戳/游動作鍵,純 touch.ts + mergeSnapshots 併鍵盤管線,Scale.FIT 塞手機〕、突發事件演出〔老鷹影子/鳥+熊 placeholder 接進 GameScene,?hazards=0 關,snapshot 增 hazards〕、D/E/F 動畫確認。新增 15 測共 201 綠+build 綠;subagent code review=ship;另全站已上 GitHub Pages 自動部署)
 2026-07-04 · by Claude (wave 11:P2-04 突發事件實作——🦅老鷹〔影子預警3s→俯衝叼走手上物資;戴三角錐/水中漂浮免疫〕、🐻熊〔林邊走出,魚優先→吃魚被引開,否則追人拍飛掉物+暈1.5s+擊退;丟魚可引開〕,兩台狀態機 hazards.ts + hazardSystem,決定性排程〔config.hazards,預設關〕。新增 18 測,`npm run check` 186 綠 + build 綠)
 2026-07-04 · by Claude (wave 10:游泳〔C 切換〕水中移動不取消〔以水域為界〕;建造改蓄力通道——動畫播 3 次〔1125ms〕才生效,移動/被戳/離範圍取消。168 綠+build 綠,AI 仍穩贏 83–102s)
@@ -15,7 +16,7 @@
 2026-07-02 · by Claude (wave 4: P0-02 收尾、P2-01 道具、P1-08 完整一局 E2E)
 
 ## 專案現況
-- **P0 完成、P1 一局可玩、P2 單機玩法核心齊備。** `npm run check` 綠:**201 測試全過** + `vite build` 綠。**P2-01 道具、P2-02 戳人、P2-03 漂浮/筏/洗澡、P2-04 突發事件(老鷹+熊)、P2-05 AI、P2-06 手機操作+事件演出+D/E/F 動畫 全部完成並接進 GameScene**(hazards 預設開、`?hazards=0` 關)。**自動部署上線:push main → GitHub Actions → GitHub Pages(https://in-this-world.github.io/Otty-DAM-IT-/)。**
+- **P0 完成、P1 一局可玩、P2 單機玩法核心齊備。** `npm run check` 綠:**203 測試全過** + `vite build` 綠。**第二批美術(P2-08)已過管線併入圖集,詳見 wave 13。****P2-01 道具、P2-02 戳人、P2-03 漂浮/筏/洗澡、P2-04 突發事件(老鷹+熊)、P2-05 AI、P2-06 手機操作+事件演出+D/E/F 動畫 全部完成並接進 GameScene**(hazards 預設開、`?hazards=0` 關)。**自動部署上線:push main → GitHub Actions → GitHub Pages(https://in-this-world.github.io/Otty-DAM-IT-/)。**
 - GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(已 push;**Actions 尚未看到 run,待排查**)。
 - 遊戲可跑:`npm run dev` → Boot(atlas+動畫註冊)→ GameScene:1P + 撒滿樹枝的場地,WASD/方向鍵移動、E/空白鍵撿放、B 建造、180s 倒數、勝負 overlay、R 重開。
 - git repo 已建(main,7 commits,任務 ID 開頭)。**分支策略(新):每組功能開 feature branch(如 `feat/P2-props`),測試全綠才併回 `main`;`main` 永遠保持可玩、綠燈。** **注意:repo 在 sandbox 開發後同步回本資料夾,Windows 端首次使用建議 `git status` 確認(可能有 CRLF 造成的假差異,`git add --renormalize .` 可解)。**
@@ -57,6 +58,8 @@
 
 - 2026-07-03:**實機三修**:(1) hold-to-swim——入水+按住 C 才漂浮(`wantsSwim`+`swim/stopSwim` 指令,`floatSystem` 加閘);AI 不按 C 故不漂浮。(2) `POKE_RADIUS` 56→90(立繪約 96px,原太小戳空)。(3) 暫態姿勢(build/poke/eat)加 `actionMs`(350ms)+`transientActionSystem` 自動回 idle/carry,修「B 建造卡住要移動才復原」。
 - 2026-07-03:**實機驗證(Chrome MCP)**:127.0.0.1(非 localhost,受 Chrome 政策)、`npm run dev -- --host 127.0.0.1`(vite Windows 綁 IPv6);Phaser 於**隱藏分頁**會凍結整個 loop(rAF 暫停)——分頁需前景可見才會跑,單機遊玩切走會暫停(P3 伺服器端不受影響)。
+
+- 2026-07-05:**第二批美術管線(P2-08/P2-09)**:沿用單一 `otter.png` 圖集(新增即附加,不動 game 端載入)。角色動畫沿用全域去背;新素材改 `floodKeyBackground`(邊界連通)保住封閉的灰/白內部(石頭/魚肚/泡泡/鷹頭/水壩)。物件只進圖集 + `objects.json`,不進 `animations.json`(遊戲直接用幀名)。NPC 體型對比(熊>>獺>>魚)在 render 時縮放,幀統一 128px。`win` 因來源有卡片底改用全域去背;`hold_hands_float` 來源有硬邊框且指南標為備援,故捨棄(改單漂+連線)。
 
 ## 已知問題 / 注意
 - Assets 檔名含中文與空格,管線腳本處理路徑要加引號
