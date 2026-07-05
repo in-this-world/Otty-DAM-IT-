@@ -18,6 +18,12 @@ export const LOOPING_KEYS: ReadonlySet<string> = new Set([
   'carry',
   'float',
   'build',
+  // wave 2: continuous loops (idle-like, cycles, ambient)
+  'dizzy',
+  'wash',
+  'eagle',
+  'bear',
+  'cone_hat',
 ]);
 
 export const DEFAULT_FRAME_RATE = 8;

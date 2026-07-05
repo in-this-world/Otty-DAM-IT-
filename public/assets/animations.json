@@ -73,6 +73,105 @@
       ],
       "frameRate": 8,
       "repeat": -1
+    },
+    {
+      "key": "dizzy",
+      "frames": [
+        "dizzy_0",
+        "dizzy_1"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "throw",
+      "frames": [
+        "throw_0",
+        "throw_1",
+        "throw_2"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "dig",
+      "frames": [
+        "dig_0",
+        "dig_1",
+        "dig_2",
+        "dig_3"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "pick_stone",
+      "frames": [
+        "pick_stone_0",
+        "pick_stone_1",
+        "pick_stone_2"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "wash",
+      "frames": [
+        "wash_0",
+        "wash_1",
+        "wash_2",
+        "wash_3"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "win",
+      "frames": [
+        "win_0",
+        "win_1"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "lose",
+      "frames": [
+        "lose_0"
+      ],
+      "frameRate": 8,
+      "repeat": 0
+    },
+    {
+      "key": "eagle",
+      "frames": [
+        "eagle_0",
+        "eagle_1",
+        "eagle_2"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "bear",
+      "frames": [
+        "bear_0",
+        "bear_1",
+        "bear_2"
+      ],
+      "frameRate": 8,
+      "repeat": -1
+    },
+    {
+      "key": "cone_hat",
+      "frames": [
+        "cone_hat_0",
+        "cone_hat_1",
+        "cone_hat_2",
+        "cone_hat_3"
+      ],
+      "frameRate": 8,
+      "repeat": -1
     }
   ]
 }

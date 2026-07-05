@@ -79,3 +79,74 @@ export function applyColorKey(img: RawRGBA, bg: RGB, opts: ColorKeyOptions = {})
   }
   return { data: out, width: img.width, height: img.height };
 }
+
+/**
+ * Border-connected ("flood fill") background removal. Only pixels that are
+ * (a) close to the background color AND (b) reachable from the image border
+ * through other background-colored pixels are made transparent. Unlike
+ * {@link applyColorKey}, this preserves background-colored regions that are
+ * *enclosed* by the subject's outline — e.g. gray stones, white fish bellies,
+ * bubbles, an eagle's white head — which a global color-key would punch out.
+ *
+ * Alpha on the removed (outside) region ramps over the feather band exactly
+ * like applyColorKey; interior/subject pixels keep their original alpha.
+ * 4-connectivity is used so the fill cannot slip through 1px diagonal gaps in
+ * an anti-aliased outline and eat into the subject. The input is not mutated.
+ */
+export function floodKeyBackground(img: RawRGBA, bg: RGB, opts: ColorKeyOptions = {}): RawRGBA {
+  const tolerance = opts.tolerance ?? DEFAULT_TOLERANCE;
+  const feather = Math.max(1, opts.feather ?? DEFAULT_FEATHER);
+  const { width, height, data: src } = img;
+  const out = new Uint8Array(src);
+  const n = width * height;
+
+  const dist = new Float32Array(n);
+  const cand = new Uint8Array(n); // within tolerance+feather of bg -> floodable
+  for (let p = 0; p < n; p++) {
+    const i = p * 4;
+    const dr = src[i]! - bg.r;
+    const dg = src[i + 1]! - bg.g;
+    const db = src[i + 2]! - bg.b;
+    const d = Math.sqrt(dr * dr + dg * dg + db * db);
+    dist[p] = d;
+    cand[p] = d <= tolerance + feather ? 1 : 0;
+  }
+
+  // Flood fill from every border pixel through floodable pixels.
+  const outside = new Uint8Array(n);
+  const stack: number[] = [];
+  const push = (p: number): void => {
+    if (cand[p] && !outside[p]) {
+      outside[p] = 1;
+      stack.push(p);
+    }
+  };
+  for (let x = 0; x < width; x++) {
+    push(x);
+    push((height - 1) * width + x);
+  }
+  for (let y = 0; y < height; y++) {
+    push(y * width);
+    push(y * width + (width - 1));
+  }
+  while (stack.length > 0) {
+    const p = stack.pop()!;
+    const x = p % width;
+    const y = (p - x) / width;
+    if (x > 0) push(p - 1);
+    if (x < width - 1) push(p + 1);
+    if (y > 0) push(p - width);
+    if (y < height - 1) push(p + width);
+  }
+
+  for (let p = 0; p < n; p++) {
+    if (!outside[p]) continue; // interior / subject -> keep original alpha
+    const d = dist[p]!;
+    let a: number;
+    if (d <= tolerance) a = 0;
+    else if (d >= tolerance + feather) a = 255;
+    else a = Math.round(((d - tolerance) / feather) * 255);
+    out[p * 4 + 3] = Math.min(a, src[p * 4 + 3]!);
+  }
+  return { data: out, width, height };
+}

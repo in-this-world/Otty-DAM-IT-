@@ -1,7 +1,8 @@
 /**
- * P0-03 asset pipeline entry point (`npm run assets`).
- * Reads the A..G sprite strips from Assets/ and writes the packed atlas
- * (otter.png + otter.json) and animations.json to public/assets/.
+ * Asset pipeline entry point (`npm run assets`).
+ * Reads the OTTY action strips (A..R) + object strips from Assets/ and writes
+ * the packed atlas (otter.png + otter.json), animations.json and objects.json
+ * to public/assets/.
  */
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,7 +18,8 @@ async function main(): Promise<void> {
   });
 
   console.log(
-    `atlas: ${result.atlasSize.width}x${result.atlasSize.height}, ${result.frameTotal} frames`,
+    `atlas: ${result.atlasSize.width}x${result.atlasSize.height}, ` +
+      `${result.frameTotal} frames (${result.animCount} animations, ${result.objectCount} object sets)`,
   );
   let total = 0;
   for (const [file, size] of Object.entries(result.bytes)) {
