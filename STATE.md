@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-05 · by Claude (wave 14:第二批美術接進 GameScene——道具改 obj_* 貼圖〔樹枝/魚/石頭/錐/土〕、水壩改 obj_dam 分階段〔進度 0→3、勝利換裝飾幀 5〕、老鷹/熊改真動畫 sprite〔體型 熊>>獺>>鷹,鷹留地面影子預警〕、三角錐帽套頭、暈眩〔stunnedMs>0〕/勝利/失敗動畫。新增純模組 src/game/render-map.ts〔state→幀/動畫映射,零 Phaser〕+6 測含契約測〔映射的幀/動畫都存在於 atlas〕。不動 core。`npm run check` 209 綠 + build 綠。E2E:凍結截圖〔boot/mobile,hazards=0〕因道具/水壩改貼圖會變,CI 於 main 自動重生 linux 基準〔首跑紅一次後補基準即綠〕)
 2026-07-05 · by Claude (wave 13:第二批美術過管線——新增 11 動作/NPC 動畫〔dizzy/throw/dig/pick_stone/wash/win/lose/eagle/bear/cone_hat〕+ 9 組物件貼圖〔obj_cone/wood/fish/falling/stone/dirt/splash/dam〔8 階段〕/star〕。單一 otter.png 圖集 88 幀 908×1688 ~1.13MB〔遠低於 3MB 預算〕;新增 objects.json 物件清單。管線加 floodKeyBackground〔邊界連通去背〕保住灰/白內部〔石頭/魚肚/泡泡/鷹頭/水壩〕;win 用全域去背化掉卡片底、O 牽手圖有硬邊框故捨棄〔改單漂+連線〕。P2-08 done、P2-09 部分〔剩場景 tiles〕。`npm run check` 203 綠 + build 綠)
 2026-07-04 · by Claude (wave 12:P2-06 手機操作〔虛擬搖桿+撿放/建/戳/游動作鍵,純 touch.ts + mergeSnapshots 併鍵盤管線,Scale.FIT 塞手機〕、突發事件演出〔老鷹影子/鳥+熊 placeholder 接進 GameScene,?hazards=0 關,snapshot 增 hazards〕、D/E/F 動畫確認。新增 15 測共 201 綠+build 綠;subagent code review=ship;另全站已上 GitHub Pages 自動部署)
 2026-07-04 · by Claude (wave 11:P2-04 突發事件實作——🦅老鷹〔影子預警3s→俯衝叼走手上物資;戴三角錐/水中漂浮免疫〕、🐻熊〔林邊走出,魚優先→吃魚被引開,否則追人拍飛掉物+暈1.5s+擊退;丟魚可引開〕,兩台狀態機 hazards.ts + hazardSystem,決定性排程〔config.hazards,預設關〕。新增 18 測,`npm run check` 186 綠 + build 綠)
