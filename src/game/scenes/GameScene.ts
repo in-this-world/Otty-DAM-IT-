@@ -39,7 +39,7 @@ import { OTTER_TEXTURE } from './BootScene';
 const PLAYER_ID = 'otter-1';
 const WORLD = { width: 960, height: 540 };
 const OTTER_DISPLAY_HEIGHT = 96;
-const ITEM_DISPLAY_HEIGHT = 30;
+const ITEM_DISPLAY_HEIGHT = 42;
 const CONE_HAT_HEIGHT = 34;
 const DAM_DISPLAY_HEIGHT = 104;
 const EFFECT_DISPLAY_HEIGHT = 40;
