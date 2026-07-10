@@ -1,17 +1,25 @@
 /**
- * P1-05/06/07: the playable single-machine round.
+ * P1-05/06/07 + P2-08/09 art: the playable single-machine round.
  *
- * Reads core state via LocalAdapter and renders it — no game rules live
- * here (CLAUDE.md rule 2). Placeholder art for items/dam until P2-08.
+ * Reads core state via LocalAdapter and renders it — no game rules live here
+ * (CLAUDE.md rule 2). Wave-2 art (obj_* props, dam stages, eagle/bear NPCs,
+ * dizzy/win/lose clips) is mapped by the pure src/game/render-map module.
  *
- * Controls: Arrows/WASD move · E/Space pick up / drop · B build · R restart.
+ * Controls: Arrows/WASD move · E/Space pick up / drop · B build · F poke ·
+ * C swim (toggle) · R restart.
  */
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
 import { planOtterCommands, recommendedAiCount } from '../../core/ai';
 import { DEFAULT_OTTER_SPEED_PER_SEC } from '../../core/state';
 import type { GameState } from '../../core/types';
-import { animationKeyForAction } from '../anim/registry';
+import {
+  CONE_HAT_FRAME,
+  NPC,
+  damStageFrame,
+  itemFrame,
+  otterAnimKey,
+} from '../render-map';
 import {
   deriveCommands,
   INITIAL_TRACKER,
@@ -28,13 +36,16 @@ import { OTTER_TEXTURE } from './BootScene';
 const PLAYER_ID = 'otter-1';
 const WORLD = { width: 960, height: 540 };
 const OTTER_DISPLAY_HEIGHT = 96;
+const ITEM_DISPLAY_HEIGHT = 30;
+const CONE_HAT_HEIGHT = 34;
+const DAM_DISPLAY_HEIGHT = 104;
 /** Local solo play spawns AI teammates to fill out a small party (P2-05). */
 const HUMAN_COUNT = 1;
 const DEFAULT_PARTY_SIZE = 3;
-/** AI otters move at this %% of normal speed by default (?aiSpeed overrides). */
+/** AI otters move at this % of normal speed by default (?aiSpeed overrides). */
 const DEFAULT_AI_SPEED_PCT = 55;
 /** Placeholder water zone (P2-03): float + raft + wash-off debuff. Real
- *  level layout arrives with P2-08/P4 art. */
+ *  level layout arrives with P4 art. */
 const WATER = [{ x: 40, y: 372, width: 250, height: 140 }] as const;
 
 export class GameScene extends Phaser.Scene {
@@ -46,20 +57,20 @@ export class GameScene extends Phaser.Scene {
   private tracker: InputTracker = INITIAL_TRACKER;
 
   private otterSprites = new Map<string, Phaser.GameObjects.Sprite>();
-  private itemDots = new Map<string, Phaser.GameObjects.Arc>();
+  private coneHats = new Map<string, Phaser.GameObjects.Sprite>();
+  private itemSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private damZone!: Phaser.GameObjects.Rectangle;
-  private damFill!: Phaser.GameObjects.Rectangle;
+  private damSprite!: Phaser.GameObjects.Sprite;
   private hudBarBg!: Phaser.GameObjects.Rectangle;
   private hudBarFill!: Phaser.GameObjects.Rectangle;
   private hudTimer!: Phaser.GameObjects.Text;
   private overlay: Phaser.GameObjects.Container | null = null;
 
   private mobileControls!: MobileControls;
-  // P2-06 hazard placeholders (real art: P2-08/09).
+  // P2-08/09: real NPC art (eagle keeps a ground shadow as its telegraph).
   private eagleShadow: Phaser.GameObjects.Ellipse | null = null;
-  private eagleBird: Phaser.GameObjects.Arc | null = null;
-  private bearBody: Phaser.GameObjects.Arc | null = null;
-  private bearLabel: Phaser.GameObjects.Text | null = null;
+  private eagleSprite: Phaser.GameObjects.Sprite | null = null;
+  private bearSprite: Phaser.GameObjects.Sprite | null = null;
 
   constructor() {
     super('Game');
@@ -70,8 +81,6 @@ export class GameScene extends Phaser.Scene {
     // AI teammates fill the party for single-machine play; ?ai=N overrides
     // (E2E pins ?ai=0 for a deterministic single-otter round).
     const aiCount = params.ai ?? recommendedAiCount(HUMAN_COUNT, DEFAULT_PARTY_SIZE);
-    // AI otters move slower than the human so they don't zip around; ?aiSpeed
-    // (percent of normal) tunes it.
     const aiSpeedPct = params.aiSpeed ?? DEFAULT_AI_SPEED_PCT;
     const aiSpeed = Math.round((DEFAULT_OTTER_SPEED_PER_SEC * aiSpeedPct) / 100);
     const speedByOtter: Record<string, number> = {};
@@ -85,11 +94,7 @@ export class GameScene extends Phaser.Scene {
       water: WATER,
       speedByOtter,
       timerMs: params.timer ?? 180_000,
-      // E2E hook (?required=N): shrink the win condition so a full
-      // win round fits inside a test budget. Omitted -> core default.
       ...(params.required !== null ? { damRequiredPerPlayer: params.required } : {}),
-      // P2-06: eagle/bear sudden events. On by default; ?hazards=0 disables
-      // them (E2E determinism / stable screenshots).
       ...(params.hazards ? { hazards: { enabled: true } } : {}),
     });
 
@@ -98,8 +103,6 @@ export class GameScene extends Phaser.Scene {
     this.createDam();
     this.createHud();
 
-    // P2-06 mobile controls: shown on touch devices or a narrow viewport
-    // (visibility recomputed each frame so rotate/resize toggles it).
     this.mobileControls = new MobileControls(this);
     this.mobileControls.setVisible(false);
 
@@ -119,7 +122,6 @@ export class GameScene extends Phaser.Scene {
     this.events.on(Phaser.Scenes.Events.SHUTDOWN, () => this.teardown());
 
     if (params.freeze) {
-      // deterministic screenshot mode: sim clock off, animations frozen
       this.anims.pauseAll();
     } else {
       this.adapter.start();
@@ -132,7 +134,6 @@ export class GameScene extends Phaser.Scene {
     const state = this.latest;
     if (!state) return;
 
-    // input -> commands (pure mapping, unit-tested)
     const me = state.otters[PLAYER_ID];
     const snapshot = mergeSnapshots(
       snapshotFromCodes(this.codesDown),
@@ -162,39 +163,62 @@ export class GameScene extends Phaser.Scene {
       let sprite = this.otterSprites.get(o.id);
       if (!sprite) {
         sprite = this.add.sprite(o.pos.x, o.pos.y, OTTER_TEXTURE);
-        const scale = OTTER_DISPLAY_HEIGHT / sprite.height;
-        sprite.setScale(scale);
+        sprite.setScale(OTTER_DISPLAY_HEIGHT / sprite.height);
         this.otterSprites.set(o.id, sprite);
       }
       sprite.setPosition(o.pos.x, o.pos.y);
       sprite.setFlipX(o.facing === 'left');
-      const key = animationKeyForAction(o.action);
+      const key = otterAnimKey(o, state.phase);
       if (sprite.anims.currentAnim?.key !== key && this.anims.exists(key)) {
         sprite.play(key);
       }
+      this.renderConeHat(o.id, o.hat === 'cone', o.pos.x, o.pos.y);
     }
+  }
+
+  /** Whether the atlas actually has a frame (guards against art gaps). */
+  private hasFrame(frame: string): boolean {
+    return this.textures.get(OTTER_TEXTURE).has(frame);
+  }
+
+  /** Small cone worn above the head while an otter holds the cone hat (P2-01). */
+  private renderConeHat(id: string, wearing: boolean, x: number, y: number): void {
+    let hat = this.coneHats.get(id);
+    if (!wearing) {
+      hat?.setVisible(false);
+      return;
+    }
+    if (!hat) {
+      if (!this.hasFrame(CONE_HAT_FRAME)) return;
+      hat = this.add.sprite(x, y, OTTER_TEXTURE, CONE_HAT_FRAME);
+      hat.setScale(CONE_HAT_HEIGHT / hat.height);
+      this.coneHats.set(id, hat);
+    }
+    hat.setVisible(true).setPosition(x, y - OTTER_DISPLAY_HEIGHT * 0.52);
   }
 
   private renderItems(state: GameState): void {
     const seen = new Set<string>();
     for (const item of Object.values(state.items)) {
       if (item.heldBy !== null) {
-        this.itemDots.get(item.id)?.setVisible(false);
+        this.itemSprites.get(item.id)?.setVisible(false);
         continue;
       }
       seen.add(item.id);
-      let dot = this.itemDots.get(item.id);
-      if (!dot) {
-        // placeholder: branches are brown dots (real art arrives with P2-08)
-        dot = this.add.circle(item.pos.x, item.pos.y, 7, 0x8b5a2b);
-        this.itemDots.set(item.id, dot);
+      let sprite = this.itemSprites.get(item.id);
+      if (!sprite) {
+        const frame = itemFrame(item.type);
+        if (!this.hasFrame(frame)) continue;
+        sprite = this.add.sprite(item.pos.x, item.pos.y, OTTER_TEXTURE, frame);
+        sprite.setScale(ITEM_DISPLAY_HEIGHT / sprite.height);
+        this.itemSprites.set(item.id, sprite);
       }
-      dot.setVisible(true).setPosition(item.pos.x, item.pos.y);
+      sprite.setVisible(true).setPosition(item.pos.x, item.pos.y);
     }
-    for (const [id, dot] of this.itemDots) {
+    for (const [id, sprite] of this.itemSprites) {
       if (!seen.has(id) && state.items[id] === undefined) {
-        dot.destroy();
-        this.itemDots.delete(id);
+        sprite.destroy();
+        this.itemSprites.delete(id);
       }
     }
   }
@@ -221,9 +245,11 @@ export class GameScene extends Phaser.Scene {
   private createDam(): void {
     const site = { x: WORLD.width / 2, y: 96 };
     this.damZone = this.add
-      .rectangle(site.x, site.y, 240, 72, 0x4a3421, 0.35)
+      .rectangle(site.x, site.y, 240, 72, 0x4a3421, 0.2)
       .setStrokeStyle(2, 0xd9b380);
-    this.damFill = this.add.rectangle(site.x - 120, site.y + 36, 0, 10, 0x8b5a2b).setOrigin(0, 1);
+    // staged dam sprite; frame set each tick from progress (render-map).
+    this.damSprite = this.add.sprite(site.x, site.y + 24, OTTER_TEXTURE, 'obj_dam_0').setOrigin(0.5, 1);
+    if (this.damSprite.height > 0) this.damSprite.setScale(DAM_DISPLAY_HEIGHT / this.damSprite.height);
     this.add
       .text(site.x, site.y - 52, 'DAM', { fontSize: '16px', color: '#d9b380' })
       .setOrigin(0.5);
@@ -247,8 +273,11 @@ export class GameScene extends Phaser.Scene {
   private renderDamAndHud(state: GameState): void {
     const ratio = progressRatio(state.dam.progress, state.dam.required);
     this.hudBarFill.width = 256 * ratio;
-    this.damFill.width = 240 * ratio;
     this.hudTimer.setText(formatTime(state.timerMs));
+    const frame = damStageFrame(state.dam.progress, state.dam.required, state.phase);
+    if (this.hasFrame(frame) && this.damSprite.frame.name !== frame) {
+      this.damSprite.setFrame(frame);
+    }
   }
 
   private renderOverlay(state: GameState): void {
@@ -276,34 +305,45 @@ export class GameScene extends Phaser.Scene {
     return this.sys.game.device.input.touch || window.innerWidth < 820;
   }
 
-  /** P2-06: draw placeholder eagle (shadow + bird) and bear from state.hazards. */
+  /** P2-08/09: eagle + bear NPCs from state.hazards, real animated sprites. */
   private renderHazards(state: GameState): void {
     const eagle = state.hazards?.eagle ?? null;
     if (eagle) {
       const { x, y } = eagle.pos;
       const warning = eagle.phase === 'warning';
-      if (!this.eagleShadow) this.eagleShadow = this.add.ellipse(x, y, 64, 28, 0x000000, 0.35);
-      this.eagleShadow.setPosition(x, y).setVisible(true).setAlpha(warning ? 0.35 : 0.5);
-      if (!this.eagleBird) this.eagleBird = this.add.circle(x, y, 16, 0x3a2c22);
-      // bird hovers high during the warning, then dives onto the target
-      this.eagleBird.setPosition(x, y - (warning ? 110 : 14)).setVisible(true);
+      if (!this.eagleShadow) this.eagleShadow = this.add.ellipse(x, y, 70, 30, 0x000000, 0.35);
+      this.eagleShadow.setPosition(x, y).setVisible(true).setAlpha(warning ? 0.3 : 0.5);
+      if (!this.eagleSprite) this.eagleSprite = this.makeNpc(NPC.eagle.animKey, NPC.eagle.displayHeight);
+      // bird circles high during the warning, then dives onto the target.
+      this.eagleSprite?.setPosition(x, y - (warning ? 120 : 16)).setVisible(true);
     } else {
       this.eagleShadow?.setVisible(false);
-      this.eagleBird?.setVisible(false);
+      this.eagleSprite?.setVisible(false);
     }
 
     const bear = state.hazards?.bear ?? null;
     if (bear) {
       const { x, y } = bear.pos;
-      if (!this.bearBody) this.bearBody = this.add.circle(x, y, 22, 0x6b4a2b).setStrokeStyle(2, 0x3a2617);
-      this.bearBody.setPosition(x, y).setVisible(true);
-      if (!this.bearLabel)
-        this.bearLabel = this.add.text(x, y, '熊', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
-      this.bearLabel.setPosition(x, y).setVisible(true);
+      if (!this.bearSprite) this.bearSprite = this.makeNpc(NPC.bear.animKey, NPC.bear.displayHeight);
+      // face the target it is lumbering toward (defaults to right-facing art).
+      let target: { readonly x: number; readonly y: number } | null = null;
+      if (bear.targetOtterId) target = state.otters[bear.targetOtterId]?.pos ?? null;
+      else if (bear.targetItemId) target = state.items[bear.targetItemId]?.pos ?? null;
+      if (this.bearSprite) {
+        this.bearSprite.setPosition(x, y).setVisible(true);
+        if (target) this.bearSprite.setFlipX(target.x < x);
+      }
     } else {
-      this.bearBody?.setVisible(false);
-      this.bearLabel?.setVisible(false);
+      this.bearSprite?.setVisible(false);
     }
+  }
+
+  /** Create an NPC sprite playing `animKey`, scaled to `displayHeight`. */
+  private makeNpc(animKey: string, displayHeight: number): Phaser.GameObjects.Sprite | null {
+    const sprite = this.add.sprite(0, 0, OTTER_TEXTURE);
+    if (sprite.height > 0) sprite.setScale(displayHeight / sprite.height);
+    if (this.anims.exists(animKey)) sprite.play(animKey);
+    return sprite;
   }
 
   /* ------------------------------ lifecycle ------------------------------ */
@@ -311,11 +351,11 @@ export class GameScene extends Phaser.Scene {
   private restart(): void {
     this.teardown();
     this.otterSprites.clear();
-    this.itemDots.clear();
+    this.coneHats.clear();
+    this.itemSprites.clear();
     this.overlay = null;
-    this.eagleShadow = this.eagleBird = null;
-    this.bearBody = null;
-    this.bearLabel = null;
+    this.eagleShadow = this.eagleSprite = null;
+    this.bearSprite = null;
     this.tracker = INITIAL_TRACKER;
     this.scene.restart();
   }
