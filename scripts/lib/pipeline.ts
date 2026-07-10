@@ -30,6 +30,7 @@ import {
   type RawRGBA,
 } from './colorkey';
 import { buildPhaserAtlasJson, packFrames, type FrameInput } from './atlas';
+import { chooseCutPoints, occupiedColumns } from './slice';
 import { buildAnimationsManifest, DEFAULT_FRAME_RATE } from './animations';
 
 /** Background-removal strategy per source sheet. */
@@ -175,6 +176,83 @@ export async function processSheet(
   return frames;
 }
 
+/**
+ * Slice an OBJECT strip into `frameCount` props using content-aware gap cuts
+ * (not equal cells), tight-crop each prop, then centre it at native size on a
+ * per-sheet square canvas (relative sizes preserved, no distortion, no seams).
+ * Frames are named `${key}_${startIndex + i}`.
+ */
+export async function processObjectSheet(
+  filePath: string,
+  key: string,
+  opts: SheetOptions = {},
+  startIndex = 0,
+): Promise<ProcessedFrame[]> {
+  const frameHeight = opts.frameHeight ?? DEFAULT_FRAME_HEIGHT;
+  const { data, info } = await sharp(filePath).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const grid = detectGrid(info.width, info.height);
+  const img = { data: new Uint8Array(data), width: info.width, height: info.height };
+  const bg = sampleBackgroundColor(img);
+  const keyed = floodKeyBackground(img, bg, {
+    tolerance: opts.tolerance ?? DEFAULT_TOLERANCE,
+    feather: opts.feather ?? DEFAULT_FEATHER,
+  });
+  const keyedBuf = Buffer.from(keyed.data.buffer, keyed.data.byteOffset, keyed.data.byteLength);
+  const occ = occupiedColumns(keyed.data, info.width, info.height);
+  const cuts = chooseCutPoints(occ, grid.frameCount);
+  const bounds = [0, ...cuts, info.width];
+
+  // pass 1: tight-crop each segment to its content bbox
+  const cropped: { buf: Buffer; w: number; h: number }[] = [];
+  for (let i = 0; i < grid.frameCount; i++) {
+    const left = Math.min(Math.max(0, bounds[i]!), info.width - 1);
+    const width = Math.min(Math.max(1, bounds[i + 1]! - left), info.width - left);
+    const segPng = await sharp(keyedBuf, { raw: { width: info.width, height: info.height, channels: 4 } })
+      .extract({ left, top: 0, width, height: info.height })
+      .png()
+      .toBuffer();
+    let out;
+    try {
+      out = await sharp(segPng).trim().png().toBuffer({ resolveWithObject: true });
+    } catch {
+      out = await sharp(segPng).png().toBuffer({ resolveWithObject: true }); // uniform/empty -> keep
+    }
+    cropped.push({ buf: out.data, w: out.info.width, h: out.info.height });
+  }
+
+  // pass 2: centre each crop at native size on a common square, resize to frameHeight
+  const side = Math.max(1, ...cropped.map((c) => Math.max(c.w, c.h)));
+  const frames: ProcessedFrame[] = [];
+  for (let i = 0; i < cropped.length; i++) {
+    const c = cropped[i]!;
+    const padL = Math.floor((side - c.w) / 2);
+    const padT = Math.floor((side - c.h) / 2);
+    // NOTE: sharp applies resize BEFORE extend within one pipeline, so pad to
+    // the square in one call, then resize in a fresh instance.
+    const paddedPng = await sharp(c.buf)
+      .extend({
+        top: padT,
+        bottom: side - c.h - padT,
+        left: padL,
+        right: side - c.w - padL,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
+      .png()
+      .toBuffer();
+    const squared = await sharp(paddedPng)
+      .resize(frameHeight, frameHeight, { kernel: 'lanczos3' })
+      .raw()
+      .toBuffer();
+    frames.push({
+      name: `${key}_${startIndex + i}`,
+      data: new Uint8Array(squared),
+      width: frameHeight,
+      height: frameHeight,
+    });
+  }
+  return frames;
+}
+
 export interface PipelineOptions {
   /** Directory containing the source sheets. */
   assetsDir: string;
@@ -266,10 +344,10 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineResult
   for (const { key, files } of findObjectFiles(opts.assetsDir)) {
     const names: string[] = [];
     for (const file of files) {
-      const frames = await processSheet(
+      const frames = await processObjectSheet(
         file,
         key,
-        { frameHeight, tolerance: opts.tolerance, feather: opts.feather, mode: 'flood' },
+        { frameHeight, tolerance: opts.tolerance, feather: opts.feather },
         names.length,
       );
       for (const f of frames) names.push(f.name);
