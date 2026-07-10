@@ -42,7 +42,7 @@
 | P2-06 | B | Developer | D/E/F 動畫 + 事件演出 + 手機虛擬搖桿雙鍵 | P2-01..04 | E2E:手機 viewport 可完整遊玩 | done | Claude 2026-07-04 |
 | P2-07 | C | Tester | 全機制 E2E 回歸包 + 60fps 效能檢測腳本 | P2-06 | 回歸全綠;效能報告存檔 | blocked | |
 | P2-08 | D | Designer | 缺口資產第一批:樹枝/魚/石頭/三角錐/土塊(規格:RGBA、單幀或 3–4 幀、風格同水獺) | — | 過管線腳本驗證即收 | done | Claude 2026-07-05(wave2 管線:88 幀/17 anims/9 物件組,203 綠+build 綠) |
-| P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | in_progress | Claude 2026-07-05(素材 done 且已接進 GameScene〔道具/水壩/NPC/帽/暈勝敗〕;僅剩場景 tiles) |
+| P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | in_progress | Claude 2026-07-05(素材+接線+演出打磨 done〔道具/水壩/NPC/帽/暈勝敗/動作clip/打擊水花特效〕;僅剩場景 tiles 待美術) |
 
 ## P3 連線
 

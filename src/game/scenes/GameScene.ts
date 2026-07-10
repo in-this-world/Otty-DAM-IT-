@@ -20,6 +20,9 @@ import {
   itemFrame,
   otterAnimKey,
 } from '../render-map';
+import { transientAnimForEvent } from '../action-anim';
+import { effectsForEvent, type EffectSpec } from '../effects';
+import type { GameEvent } from '../../core/types';
 import {
   deriveCommands,
   INITIAL_TRACKER,
@@ -39,6 +42,7 @@ const OTTER_DISPLAY_HEIGHT = 96;
 const ITEM_DISPLAY_HEIGHT = 30;
 const CONE_HAT_HEIGHT = 34;
 const DAM_DISPLAY_HEIGHT = 104;
+const EFFECT_DISPLAY_HEIGHT = 40;
 /** Local solo play spawns AI teammates to fill out a small party (P2-05). */
 const HUMAN_COUNT = 1;
 const DEFAULT_PARTY_SIZE = 3;
@@ -51,6 +55,9 @@ const WATER = [{ x: 40, y: 372, width: 250, height: 140 }] as const;
 export class GameScene extends Phaser.Scene {
   private adapter!: GameAdapter;
   private unsubscribe: Unsubscribe | null = null;
+  private eventsUnsub: Unsubscribe | null = null;
+  /** Per-otter one-shot animation override (throw/dig/pick_stone/wash). */
+  private transientAnims = new Map<string, { animKey: string; expiresAt: number }>();
   private latest: GameState | null = null;
 
   private readonly codesDown = new Set<string>();
@@ -111,6 +118,8 @@ export class GameScene extends Phaser.Scene {
       publishSnapshot(state);
       this.driveAi(state);
     });
+    // P2-09 juice: transient action clips + impact/splash effect sprites.
+    this.eventsUnsub = this.adapter.onEvents((events) => this.handleEvents(events));
 
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
       this.codesDown.add(e.code);
@@ -168,7 +177,12 @@ export class GameScene extends Phaser.Scene {
       }
       sprite.setPosition(o.pos.x, o.pos.y);
       sprite.setFlipX(o.facing === 'left');
-      const key = otterAnimKey(o, state.phase);
+      let key = otterAnimKey(o, state.phase);
+      const override = this.transientAnims.get(o.id);
+      // transient clips override the base action, but not win/lose/dizzy states.
+      if (override && this.time.now < override.expiresAt && state.phase === 'playing' && o.stunnedMs <= 0) {
+        key = override.animKey;
+      }
       if (sprite.anims.currentAnim?.key !== key && this.anims.exists(key)) {
         sprite.play(key);
       }
@@ -346,6 +360,34 @@ export class GameScene extends Phaser.Scene {
     return sprite;
   }
 
+  /** P2-09: turn per-tick core events into transient anims + effect sprites. */
+  private handleEvents(events: readonly GameEvent[]): void {
+    const state = this.latest;
+    if (!state) return;
+    for (const ev of events) {
+      const ta = transientAnimForEvent(ev);
+      if (ta && this.anims.exists(ta.animKey)) {
+        this.transientAnims.set(ta.otterId, { animKey: ta.animKey, expiresAt: this.time.now + ta.durationMs });
+      }
+      for (const fx of effectsForEvent(ev, state)) this.spawnEffect(fx);
+    }
+  }
+
+  /** Spawn a short-lived sprite that rises + fades, then destroys itself. */
+  private spawnEffect(fx: EffectSpec): void {
+    if (!this.hasFrame(fx.frame)) return;
+    const sprite = this.add.sprite(fx.x, fx.y, OTTER_TEXTURE, fx.frame);
+    if (sprite.height > 0) sprite.setScale(EFFECT_DISPLAY_HEIGHT / sprite.height);
+    this.tweens.add({
+      targets: sprite,
+      alpha: 0,
+      y: fx.y - fx.riseY,
+      duration: fx.ttlMs,
+      ease: 'Quad.easeOut',
+      onComplete: () => sprite.destroy(),
+    });
+  }
+
   /* ------------------------------ lifecycle ------------------------------ */
 
   private restart(): void {
@@ -356,6 +398,8 @@ export class GameScene extends Phaser.Scene {
     this.overlay = null;
     this.eagleShadow = this.eagleSprite = null;
     this.bearSprite = null;
+    this.transientAnims.clear();
+    this.eventsUnsub = null;
     this.tracker = INITIAL_TRACKER;
     this.scene.restart();
   }
@@ -363,6 +407,8 @@ export class GameScene extends Phaser.Scene {
   private teardown(): void {
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.eventsUnsub?.();
+    this.eventsUnsub = null;
     this.mobileControls?.destroy();
     this.adapter.stop();
   }
