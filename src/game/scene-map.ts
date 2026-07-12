@@ -145,10 +145,13 @@ export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 })
   const creek: { x: number; y: number; size: number; frame: number }[] = [
     { x: DAM_SITE.x, y: -20, size: 152, frame: 0 }, // upstream, from the forest
     { x: DAM_SITE.x, y: 110, size: 152, frame: 1 }, // foundation stones under the dam
-    { x: 452, y: 220, size: 132, frame: 0 }, // downstream bends toward the river
-    { x: 408, y: 300, size: 126, frame: 0 },
-    { x: 366, y: 362, size: 122, frame: 0 },
-    { x: 338, y: 420, size: 124, frame: 0 }, // merges into the river shallows
+    // downstream: tightly overlapped small steps so it reads as one stream
+    { x: 466, y: 196, size: 118, frame: 0 },
+    { x: 448, y: 244, size: 112, frame: 0 },
+    { x: 428, y: 290, size: 110, frame: 0 },
+    { x: 406, y: 334, size: 110, frame: 0 },
+    { x: 382, y: 374, size: 112, frame: 0 },
+    { x: 358, y: 410, size: 116, frame: 0 }, // merges into the river shallows
   ];
   for (const c of creek) {
     tiles.push({ texture: 'tile_riverbed', frame: c.frame, x: c.x, y: c.y, size: c.size });

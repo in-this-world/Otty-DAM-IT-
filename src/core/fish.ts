@@ -15,6 +15,9 @@ export const FISH_SWIM_SPEED_PER_SEC = 26;
 export const FISH_HEADING_PERIOD_TICKS = 50;
 /** Keep this far inside the water rect edges. */
 export const FISH_MARGIN = 14;
+/** Extra inset from the rect TOP: the bank tiles' upper half is painted
+ *  grass/sand, so fish stay below it to read as "in the water" (P2-12). */
+export const FISH_TOP_INSET = 58;
 
 /** FNV-1a based hash -> [0,1). Stable across platforms. */
 function hash01(id: string, epoch: number): number {
@@ -56,7 +59,7 @@ export function fishSwimSystem(state: GameState, dtMs: number, events: GameEvent
     const angle = hash01(it.id, epoch) * Math.PI * 2;
     const pos: Vec2 = {
       x: clamp(it.pos.x + Math.cos(angle) * step, rect.x + FISH_MARGIN, rect.x + rect.width - FISH_MARGIN),
-      y: clamp(it.pos.y + Math.sin(angle) * step, rect.y + FISH_MARGIN, rect.y + rect.height - FISH_MARGIN),
+      y: clamp(it.pos.y + Math.sin(angle) * step, rect.y + FISH_TOP_INSET, rect.y + rect.height - FISH_MARGIN),
     };
     if (pos.x === it.pos.x && pos.y === it.pos.y) continue;
     if (!items) items = { ...state.items };
