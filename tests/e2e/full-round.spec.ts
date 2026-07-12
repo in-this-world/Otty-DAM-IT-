@@ -76,8 +76,9 @@ const PLAYER_ID = 'otter-1';
 const DAM_SITE = { x: 480, y: 96 };
 /** Core PICKUP_RADIUS is 48; trigger early to absorb one poll of drift. */
 const PICKUP_TRIGGER = 28;
-/** Core BUILD_RADIUS is 120; same overshoot margin. */
-const BUILD_TRIGGER = 90;
+/** P2-12: the build check is now a RECT (±120 x, ±56 y around the site).
+ *  Arrive well inside it from any approach direction. */
+const BUILD_TRIGGER = 40;
 const POLL_MS = 100;
 /** Wall-clock budget for the whole ferry loop (test timeout is 120s). */
 const BOT_BUDGET_MS = 90_000;
