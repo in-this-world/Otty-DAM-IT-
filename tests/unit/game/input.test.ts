@@ -6,6 +6,7 @@ import {
   deriveCommands,
   EMPTY_SNAPSHOT,
   INITIAL_TRACKER,
+  mergeSnapshots,
   resolveDirection,
   snapshotFromCodes,
 } from '../../../src/game/input';
@@ -89,5 +90,36 @@ describe('game/input swim (P2-03 hold-to-swim)', () => {
     expect(r.commands).toEqual([]);
     r = deriveCommands(r.tracker, { ...EMPTY_SNAPSHOT, swim: true }, P, false); // press again -> toggle
     expect(r.commands).toEqual([{ type: 'swim', playerId: P }]);
+  });
+});
+
+describe('P2-10: throw / dig / eat bindings', () => {
+  it('maps KeyT/KeyG/KeyQ to logical inputs', () => {
+    const snap = snapshotFromCodes(new Set(['KeyT', 'KeyG', 'KeyQ']));
+    expect(snap.throw).toBe(true);
+    expect(snap.dig).toBe(true);
+    expect(snap.eat).toBe(true);
+  });
+
+  it('edge-triggers throwItem / dig / useItem once per press', () => {
+    const down = { ...EMPTY_SNAPSHOT, throw: true, dig: true, eat: true };
+    const first = deriveCommands(INITIAL_TRACKER, down, 'p1', true);
+    expect(first.commands).toEqual(
+      expect.arrayContaining([
+        { type: 'throwItem', playerId: 'p1' },
+        { type: 'dig', playerId: 'p1' },
+        { type: 'useItem', playerId: 'p1' },
+      ]),
+    );
+    // held: no repeats next frame
+    const second = deriveCommands(first.tracker, down, 'p1', true);
+    expect(second.commands.filter((c) => c.type !== 'move' && c.type !== 'stop')).toHaveLength(0);
+  });
+
+  it('mergeSnapshots ORs the new fields (mobile buttons)', () => {
+    const merged = mergeSnapshots(EMPTY_SNAPSHOT, { throw: true, eat: true });
+    expect(merged.throw).toBe(true);
+    expect(merged.dig).toBe(false);
+    expect(merged.eat).toBe(true);
   });
 });

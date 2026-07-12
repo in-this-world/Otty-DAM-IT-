@@ -7,7 +7,7 @@
  * the P2-09 tile background comes from the pure src/game/scene-map module.
  *
  * Controls: Arrows/WASD move · E/Space pick up / drop · B build · F poke ·
- * C swim (toggle) · R restart.
+ * C swim (toggle) · T throw · G dig · Q eat · R restart.
  */
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
@@ -312,7 +312,7 @@ export class GameScene extends Phaser.Scene {
     this.hudTimer = this.add
       .text(WORLD.width - 16, 16, '--:--', { fontSize: '24px', color: '#ffffff' })
       .setOrigin(1, 0);
-    this.add.text(16, 40, 'WASD/方向鍵移動 · E/空白鍵撿放 · B建造 · F戳人 · C游泳(切換)', {
+    this.add.text(16, 40, 'WASD移動 · E撿放 · B建造 · F戳 · C游泳 · T丟 · G挖 · Q吃', {
       fontSize: '13px',
       color: '#cfe8ef',
     });

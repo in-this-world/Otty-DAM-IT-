@@ -13,6 +13,7 @@
  *   E or Space     -> contextual interact: pickUp when empty-handed, drop
  *                     when carrying (edge-triggered on key press)
  *   B              -> build (edge-triggered on key press)
+ *   T / G / Q      -> throwItem / dig / useItem(eat) (edge-triggered; P2-10)
  *   R              -> handled by GameScene directly (restart after win/lose);
  *                     it never becomes a core Command.
  */
@@ -31,6 +32,12 @@ export interface InputSnapshot {
   readonly poke: boolean;
   /** C — hold to swim while in water (P2-03). */
   readonly swim: boolean;
+  /** T — throw the held item (P2-10). */
+  readonly throw: boolean;
+  /** G — dig for dirt / leave a pit (P2-10). */
+  readonly dig: boolean;
+  /** Q — eat the held fish (P2-10). */
+  readonly eat: boolean;
 }
 
 export const EMPTY_SNAPSHOT: InputSnapshot = {
@@ -42,6 +49,9 @@ export const EMPTY_SNAPSHOT: InputSnapshot = {
   build: false,
   poke: false,
   swim: false,
+  throw: false,
+  dig: false,
+  eat: false,
 };
 
 /** KeyboardEvent.code -> logical input. Unknown codes are ignored. */
@@ -59,6 +69,9 @@ const CODE_MAP: Readonly<Record<string, keyof InputSnapshot>> = {
   KeyB: 'build',
   KeyF: 'poke',
   KeyC: 'swim',
+  KeyT: 'throw',
+  KeyG: 'dig',
+  KeyQ: 'eat',
 };
 
 /**
@@ -79,6 +92,9 @@ export function mergeSnapshots(
     build: a.build || b.build === true,
     poke: a.poke || b.poke === true,
     swim: a.swim || b.swim === true,
+    throw: a.throw || b.throw === true,
+    dig: a.dig || b.dig === true,
+    eat: a.eat || b.eat === true,
   };
 }
 
@@ -102,6 +118,9 @@ export interface InputTracker {
   readonly buildWasDown: boolean;
   readonly pokeWasDown: boolean;
   readonly swimWasDown: boolean;
+  readonly throwWasDown: boolean;
+  readonly digWasDown: boolean;
+  readonly eatWasDown: boolean;
 }
 
 export const INITIAL_TRACKER: InputTracker = {
@@ -110,6 +129,9 @@ export const INITIAL_TRACKER: InputTracker = {
   buildWasDown: false,
   pokeWasDown: false,
   swimWasDown: false,
+  throwWasDown: false,
+  digWasDown: false,
+  eatWasDown: false,
 };
 
 /** Tie-break order when several direction keys are held at once. */
@@ -173,6 +195,17 @@ export function deriveCommands(
     commands.push({ type: 'swim', playerId });
   }
 
+  // P2-10: throw / dig / eat existed in core all along — now key-bound.
+  if (snapshot.throw && !tracker.throwWasDown) {
+    commands.push({ type: 'throwItem', playerId });
+  }
+  if (snapshot.dig && !tracker.digWasDown) {
+    commands.push({ type: 'dig', playerId });
+  }
+  if (snapshot.eat && !tracker.eatWasDown) {
+    commands.push({ type: 'useItem', playerId });
+  }
+
   return {
     commands,
     tracker: {
@@ -181,6 +214,9 @@ export function deriveCommands(
       buildWasDown: snapshot.build,
       pokeWasDown: snapshot.poke,
       swimWasDown: snapshot.swim,
+      throwWasDown: snapshot.throw,
+      digWasDown: snapshot.dig,
+      eatWasDown: snapshot.eat,
     },
   };
 }

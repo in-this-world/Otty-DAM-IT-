@@ -11,7 +11,7 @@ import Phaser from 'phaser';
 import type { InputSnapshot } from '../../input';
 import { clampKnob, joystickDirections } from '../../touch';
 
-type ButtonKey = 'interact' | 'build' | 'poke' | 'swim';
+type ButtonKey = 'interact' | 'build' | 'poke' | 'swim' | 'throw' | 'dig' | 'eat';
 
 interface ActionButton {
   readonly key: ButtonKey;
@@ -28,6 +28,10 @@ const BUTTONS: readonly { key: ButtonKey; x: number; y: number; r: number; label
   { key: 'build', x: 852, y: 356, r: 34, label: '建', color: 0x8b5a2b },
   { key: 'poke', x: 770, y: 420, r: 34, label: '戳', color: 0xb5462f },
   { key: 'swim', x: 782, y: 326, r: 30, label: '游', color: 0x2f6f9f },
+  // P2-10: throw / dig / eat
+  { key: 'throw', x: 706, y: 476, r: 30, label: '丟', color: 0xa2762d },
+  { key: 'dig', x: 700, y: 380, r: 30, label: '挖', color: 0x6b4a2b },
+  { key: 'eat', x: 912, y: 356, r: 28, label: '吃', color: 0x4f8a5b },
 ];
 
 export class MobileControls {
@@ -42,6 +46,9 @@ export class MobileControls {
     build: false,
     poke: false,
     swim: false,
+    throw: false,
+    dig: false,
+    eat: false,
   };
   /** pointerId -> which button it is pressing (for multi-touch release). */
   private readonly buttonPointers = new Map<number, ButtonKey>();
