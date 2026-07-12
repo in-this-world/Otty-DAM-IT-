@@ -138,14 +138,21 @@ export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 })
     }
   }
 
-  // Riverbed ford tucked under the dam sprite — grounds the dam in a wet
-  // stream bed without reading as a floating water panel (artist review 07-12).
+  // Riverbed stream flowing in from the top edge, blocked by the dam —
+  // reads as the creek the otters are damming (artist review 07-12 v2).
   tiles.push({
     texture: 'tile_riverbed',
-    frame: 1, // the variant with big foundation stones
+    frame: 0, // plain pebbly shallows upstream
     x: DAM_SITE.x,
-    y: DAM_SITE.y + 22,
-    size: 148,
+    y: -20,
+    size: 152,
+  });
+  tiles.push({
+    texture: 'tile_riverbed',
+    frame: 1, // foundation stones right under the dam
+    x: DAM_SITE.x,
+    y: 110,
+    size: 152,
   });
 
   // Forest wall along the top edge, leaving the dam span open. Frame 1 is the
