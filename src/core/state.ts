@@ -123,18 +123,37 @@ export function createInitialState(config: GameConfig): GameState {
     // comfortably winnable; deterministic from the seed. Mostly branches,
     // plus a few fish (snacks/projectiles) and stones (heavy, 3 progress).
     const count = Math.ceil(required * 2);
+    const waterRects = config.water ?? [];
+    const inWater = (p: Vec2): boolean =>
+      waterRects.some(
+        (r) => p.x >= r.x && p.x <= r.x + r.width && p.y >= r.y && p.y <= r.y + r.height,
+      );
     for (let i = 1; i <= count; i++) {
-      const rx = rngStep(seed);
-      const ry = rngStep(rx.nextSeed);
-      seed = ry.nextSeed;
       const type = defaultItemType(i);
       const id = `${type}-${i}`;
-      items[id] = {
-        id,
-        type,
-        pos: { x: rx.value * world.width, y: world.height * 0.35 + ry.value * world.height * 0.6 },
-        heldBy: null,
-      };
+      let pos: Vec2;
+      if (type === 'fish' && waterRects.length > 0) {
+        // P2-12: fish live in the water. Deterministic spot inside a rect.
+        const rect = waterRects[i % waterRects.length]!;
+        const rx = rngStep(seed);
+        const ry = rngStep(rx.nextSeed);
+        seed = ry.nextSeed;
+        pos = {
+          x: rect.x + 16 + rx.value * Math.max(1, rect.width - 32),
+          y: rect.y + 16 + ry.value * Math.max(1, rect.height - 32),
+        };
+      } else {
+        // Land items re-roll (bounded, deterministic) until off the water.
+        pos = { x: 0, y: 0 };
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const rx = rngStep(seed);
+          const ry = rngStep(rx.nextSeed);
+          seed = ry.nextSeed;
+          pos = { x: rx.value * world.width, y: world.height * 0.35 + ry.value * world.height * 0.6 };
+          if (!inWater(pos)) break;
+        }
+      }
+      items[id] = { id, type, pos, heldBy: null };
     }
   }
 

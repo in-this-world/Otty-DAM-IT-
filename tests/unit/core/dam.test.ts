@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BUILD_CHANNEL_MS,
-  BUILD_RADIUS,
+  BUILD_ZONE_HALF,
   coopMultiplier,
   damSystem,
   requiredProgress,
@@ -135,7 +135,7 @@ describe('core/dam (P1-03)', () => {
     far = {
       ...far,
       otters: {
-        'otter-1': { ...o, pos: { x: 500, y: 96 + BUILD_RADIUS + 1 } },
+        'otter-1': { ...o, pos: { x: 500, y: 96 + BUILD_ZONE_HALF.h + 1 } },
       },
     };
     const { events } = reduce(far, [{ type: 'build', playerId: 'otter-1' }], TICK_MS);

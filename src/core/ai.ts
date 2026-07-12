@@ -10,7 +10,7 @@
  *
  * Behaviour tree (fill-in worker, 撿 → 搬 → 建):
  *   1. missing / stunned          -> [] (can't act)
- *   2. carrying a build material  -> in BUILD_RADIUS ? build : move toward dam
+ *   2. carrying a build material  -> in build zone ? build : move toward dam
  *   3. carrying a non-material    -> drop it (only materials help the dam)
  *   4. empty-handed               -> nearest free material:
  *        in PICKUP_RADIUS ? stop+pickUp : move toward it
@@ -18,7 +18,7 @@
  *
  * "人數平衡": recommendedAiCount fills a lobby up to a target head-count.
  */
-import { BUILD_AMOUNTS, BUILD_RADIUS } from './dam';
+import { BUILD_AMOUNTS, withinBuildZone } from './dam';
 import { PICKUP_RADIUS } from './inventory';
 import type { Command, Direction, GameState, ItemState, Vec2 } from './types';
 
@@ -103,7 +103,7 @@ export function planOtterCommands(state: GameState, otterId: string): Command[] 
   if (carrying !== null) {
     if (isBuildMaterial(carrying)) {
       // 搬 → 建: haul the material to the dam and build.
-      if (dist(otter.pos, state.dam.site) <= BUILD_RADIUS) {
+      if (withinBuildZone(otter.pos, state.dam.site)) {
         return [{ type: 'stop', playerId: otterId }, { type: 'build', playerId: otterId }];
       }
       const toDam = stepToward(otter.pos, state.dam.site);

@@ -11,7 +11,7 @@ import {
   recommendedAiCount,
   stepToward,
 } from '../../../src/core/ai';
-import { BUILD_RADIUS } from '../../../src/core/dam';
+import { BUILD_ZONE_HALF } from '../../../src/core/dam';
 import { createInitialState } from '../../../src/core/state';
 import { reduce } from '../../../src/core/tick';
 import type { GameState, ItemState, OtterState, Vec2 } from '../../../src/core/types';
@@ -132,11 +132,11 @@ describe('planOtterCommands branches', () => {
     ]);
   });
 
-  it('carrying a branch within BUILD_RADIUS of the dam builds', () => {
+  it('carrying a branch within the build zone of the dam builds', () => {
     const damSite = { x: 500, y: 96 };
     const s = withScene({
       otter: { carrying: 'branch' },
-      otterPos: { x: 500, y: 96 + (BUILD_RADIUS - 1) },
+      otterPos: { x: 480 + (BUILD_ZONE_HALF.w - 1), y: 96 },
       damSite,
     });
     expect(planOtterCommands(s, 'otter-1')).toEqual([

@@ -75,11 +75,12 @@ const BANK_OUTER = 2; // grass wraps top-left, water bottom-right
 export const WATER_FRAME_MS = 450;
 
 /**
- * The playable water zone, snapped to the tile grid (cols 0..2, rows 4..5)
+ * The playable water zone, snapped to the tile grid (cols 0..3, rows 4..5;
+ * P2-12 boss review: enlarged 3x2 -> 4x2)
  * and clipped to the world. Replaces the old P2-03 placeholder rect —
  * gameplay bounds and visuals now agree.
  */
-export const WATER_RECT: Rect = { x: 0, y: 384, width: 288, height: 156 };
+export const WATER_RECT: Rect = { x: 0, y: 384, width: 384, height: 156 };
 
 /** Dam site (kept in sync with GameScene.createDam). */
 export const DAM_SITE = { x: 480, y: 96 } as const;
@@ -108,7 +109,7 @@ function centred(col: number, row: number): { x: number; y: number } {
 export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 }): SceneLayout {
   const cols = Math.ceil(world.width / TILE);
   const rows = Math.ceil(world.height / TILE);
-  const waterCols = WATER_RECT.width / TILE; // 3
+  const waterCols = WATER_RECT.width / TILE; // 4 (P2-12)
   const waterRowStart = WATER_RECT.y / TILE; // 4
 
   const tiles: TilePlacement[] = [];
@@ -138,22 +139,20 @@ export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 })
     }
   }
 
-  // Riverbed stream flowing in from the top edge, blocked by the dam —
-  // reads as the creek the otters are damming (artist review 07-12 v2).
-  tiles.push({
-    texture: 'tile_riverbed',
-    frame: 0, // plain pebbly shallows upstream
-    x: DAM_SITE.x,
-    y: -20,
-    size: 152,
-  });
-  tiles.push({
-    texture: 'tile_riverbed',
-    frame: 1, // foundation stones right under the dam
-    x: DAM_SITE.x,
-    y: 110,
-    size: 152,
-  });
+  // Riverbed creek: flows in from the top edge, gets blocked by the dam,
+  // then trickles downstream into the river (P2-12: creek connects to the
+  // river instead of dead-ending at the dam).
+  const creek: { x: number; y: number; size: number; frame: number }[] = [
+    { x: DAM_SITE.x, y: -20, size: 152, frame: 0 }, // upstream, from the forest
+    { x: DAM_SITE.x, y: 110, size: 152, frame: 1 }, // foundation stones under the dam
+    { x: 452, y: 220, size: 132, frame: 0 }, // downstream bends toward the river
+    { x: 408, y: 300, size: 126, frame: 0 },
+    { x: 366, y: 362, size: 122, frame: 0 },
+    { x: 338, y: 420, size: 124, frame: 0 }, // merges into the river shallows
+  ];
+  for (const c of creek) {
+    tiles.push({ texture: 'tile_riverbed', frame: c.frame, x: c.x, y: c.y, size: c.size });
+  }
 
   // Forest wall along the top edge, leaving the dam span open. Frame 1 is the
   // bushes-gap entrance (where the bear lumbers out), placed on the right.
@@ -172,7 +171,7 @@ export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 })
   // mushrooms by the forest, a mossy rock on the right. Kept off the dam
   // approach and the open middle so gameplay stays readable.
   const decor: DecorPlacement[] = [
-    { frame: 'obj_decor_0', x: 318, y: 392, height: 52 }, // reeds at water corner
+    { frame: 'obj_decor_0', x: 420, y: 452, height: 52 }, // reeds at the river edge
     { frame: 'obj_decor_0', x: 36, y: 356, height: 44 }, // reeds on far bank
     { frame: 'obj_decor_1', x: 156, y: 178, height: 46 }, // stump under the forest
     { frame: 'obj_decor_2', x: 906, y: 338, height: 40 }, // mossy rock, right side

@@ -13,10 +13,22 @@
  * (builders - 1)). Materials (v0.1 §4.2): branch 1, dirt 1, stone 3.
  * Progress is capped at `required`; reaching it wins the round instantly.
  */
-import type { GameEvent, GameState, ItemType, OtterState } from './types';
+import type { GameEvent, GameState, ItemType, OtterState, Vec2 } from './types';
 
 /** Max distance from dam.site at which building is allowed. */
 export const BUILD_RADIUS = 120;
+
+/**
+ * P2-12: the build check is a RECTANGLE matching the on-screen dam zone
+ * (240x72 + a little forgiveness for the otter's sprite height), replacing
+ * the old circle that allowed building far below the visible zone.
+ */
+export const BUILD_ZONE_HALF = { w: 120, h: 56 } as const;
+
+/** Whether `pos` is inside the buildable zone around the dam site. */
+export function withinBuildZone(pos: Vec2, site: Vec2): boolean {
+  return Math.abs(pos.x - site.x) <= BUILD_ZONE_HALF.w && Math.abs(pos.y - site.y) <= BUILD_ZONE_HALF.h;
+}
 /** Base progress per delivered branch. */
 export const BUILD_AMOUNT = 1;
 /**
@@ -55,8 +67,7 @@ export function applyBuild(state: GameState, otter: OtterState, reject: Reject):
     reject('noBuildMaterial');
     return state;
   }
-  const d = Math.hypot(otter.pos.x - state.dam.site.x, otter.pos.y - state.dam.site.y);
-  if (d > BUILD_RADIUS) {
+  if (!withinBuildZone(otter.pos, state.dam.site)) {
     reject('tooFarFromDam');
     return state;
   }
@@ -89,8 +100,7 @@ export function damSystem(state: GameState, dtMs: number, events: GameEvent[]): 
   // 1. advance or cancel each active build channel this tick.
   for (const o of channeling) {
     const hasMaterial = o.carrying !== null && BUILD_AMOUNTS[o.carrying] !== undefined;
-    const inRange =
-      Math.hypot(o.pos.x - state.dam.site.x, o.pos.y - state.dam.site.y) <= BUILD_RADIUS;
+    const inRange = withinBuildZone(o.pos, state.dam.site);
     const moving = o.vel.x !== 0 || o.vel.y !== 0;
     if (!hasMaterial || !inRange || o.stunnedMs > 0 || moving) {
       // interrupted -> cancel; the otter keeps its material.

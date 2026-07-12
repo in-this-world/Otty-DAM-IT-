@@ -11,6 +11,7 @@
  */
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
+import { BUILD_ZONE_HALF } from '../../core/dam';
 import { planOtterCommands, recommendedAiCount } from '../../core/ai';
 import { DEFAULT_OTTER_SPEED_PER_SEC } from '../../core/state';
 import type { GameState } from '../../core/types';
@@ -292,8 +293,9 @@ export class GameScene extends Phaser.Scene {
 
   private createDam(): void {
     const site = DAM_SITE;
+    // P2-12: the drawn zone IS the core build zone (no more invisible slack).
     this.damZone = this.add
-      .rectangle(site.x, site.y, 240, 72, 0x4a3421, 0.2)
+      .rectangle(site.x, site.y, BUILD_ZONE_HALF.w * 2, BUILD_ZONE_HALF.h * 2, 0x4a3421, 0.2)
       .setStrokeStyle(2, 0xd9b380);
     // staged dam sprite; frame set each tick from progress (render-map).
     this.damSprite = this.add.sprite(site.x, site.y + 24, OTTER_TEXTURE, 'obj_dam_0').setOrigin(0.5, 1);

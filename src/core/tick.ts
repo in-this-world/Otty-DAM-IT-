@@ -13,6 +13,7 @@
  */
 import { damSystem, applyBuild } from './dam';
 import { effectsSystem } from './effects';
+import { fishSwimSystem } from './fish';
 import { floatSystem } from './float';
 import { hazardSystem } from './hazards';
 import { applyDrop, applyPickUp } from './inventory';
@@ -40,6 +41,7 @@ export type System = (state: GameState, dtMs: number, events: GameEvent[]) => Ga
 export const defaultSystems: readonly System[] = [
   movementSystem,
   floatSystem,
+  fishSwimSystem,
   effectsSystem,
   hazardSystem,
   damSystem,
