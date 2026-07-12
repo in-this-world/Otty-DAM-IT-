@@ -4,6 +4,7 @@
  * what makes lockstep/local replay and later server authority possible.
  */
 import { requiredProgress } from './dam';
+import { fishBounds } from './fish';
 import { rngStep } from './rng';
 import type {
   GamePhase,
@@ -138,10 +139,12 @@ export function createInitialState(config: GameConfig): GameState {
         const rx = rngStep(seed);
         const ry = rngStep(rx.nextSeed);
         seed = ry.nextSeed;
-        // 58px top inset: the bank art's upper half is sand/grass (P2-12).
+        // Spawn inside the visually-swimmable box (bank art paints grass on
+        // the top strip and the right edge column — see fishBounds).
+        const b = fishBounds(rect);
         pos = {
-          x: rect.x + 16 + rx.value * Math.max(1, rect.width - 32),
-          y: rect.y + 58 + ry.value * Math.max(1, rect.height - 58 - 16),
+          x: b.minX + rx.value * Math.max(1, b.maxX - b.minX),
+          y: b.minY + ry.value * Math.max(1, b.maxY - b.minY),
         };
       } else {
         // Land items re-roll (bounded, deterministic) until off the water.
