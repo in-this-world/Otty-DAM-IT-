@@ -43,12 +43,17 @@
 | P2-07 | C | Tester | 全機制 E2E 回歸包 + 60fps 效能檢測腳本 | P2-06 | 回歸全綠;效能報告存檔 | ready | (P2-06 已完成,解除 blocked 2026-07-11) |
 | P2-08 | D | Designer | 缺口資產第一批:樹枝/魚/石頭/三角錐/土塊(規格:RGBA、單幀或 3–4 幀、風格同水獺) | — | 過管線腳本驗證即收 | done | Claude 2026-07-05(wave2 管線:88 幀/17 anims/9 物件組,203 綠+build 綠) |
 | P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | done | Claude 2026-07-12(場景 tiles T1–T6 過管線+接進 GameScene,見 Docs/P2-09_tiles_summary.md) |
+| P2-10 | A+B | Developer | **輸入補全**:丟魚 T、挖土 G、吃魚 Q 接上鍵盤+手機按鍵(core 指令 throwItem/dig/useItem 早已存在,只缺映射);操作說明列更新 | P2-01 | unit:鍵→指令映射;實機:三動作可觸發且動畫正確 | ready | (boss 播測發現 2026-07-12,詳 Docs/P2-10-14_plan.md) |
+| P2-11 | B | Developer | **持物演出**:搬魚/搬石/搬土改為「carry 動畫 + 手上物件小圖疊加」(obj_* 幀,免新美術);建造中同樣顯示所用材料 | P2-10 | unit:render-map 持物→疊加幀映射;實機:三種材料視覺可辨 | ready | |
+| P2-12 | A+B | Developer | **場景/物件一致性**:水域 3×2→4×2 並與美術對齊;溪流視覺連到下游河;建造判定範圍=壩區圖形範圍;魚只生成於水中且會游動(決定性漫游,不出水域) | P2-09 | unit:scene-map/水域/魚漫游;E2E:凍結截圖更新 | ready | |
+| P2-13 | A+B | Developer | **老鷹抓人 + 反擊**:鷹改為抓「水獺」飛行 ~2s 後丟下+冰凍(暫定 3s,可調);戳 F 可趕走鷹/熊、丟魚可擊退熊(原引開保留);三角錐/水中免疫保留 | P2-04 | unit:狀態機全路徑(抓/丟/凍/反擊);實機驗證 | ready | |
+| P2-14 | C | Tester | 併入 P2-07:回歸包涵蓋 P2-10~13 新機制 + 60fps 效能腳本 | P2-10..13 | 回歸全綠;效能報告存檔 | blocked | |
 
 ## P3 連線
 
 | ID | 泳道 | 角色 | 任務 | 依賴 | 驗收條件 | 狀態 | Owner |
 |---|---|---|---|---|---|---|---|
-| P3-01 | E | Developer | Colyseus server:room schema、core 搬上伺服器跑、20Hz tick | P2 全 A 泳道 | server unit 測試綠 | blocked | |
+| P3-01 | E | Developer | Colyseus server:room schema、core 搬上伺服器跑、20Hz tick | P2 全 A 泳道(含 P2-10..13) | server unit 測試綠 | blocked | |
 | P3-02 | E | Developer | ColyseusAdapter 實作 GameAdapter;客戶端預測+插值 | P3-01 | 整合:local 與 colyseus adapter 過同一套測試 | blocked | |
 | P3-03 | B | Developer | 大廳/準備室/連結加房 `r/ABCD`、中途 spectate | P3-02 | E2E:兩個 browser context 同房互戳 | blocked | |
 | P3-04 | C | Tester | 多人 E2E:2 人合作勝利、10 人房、斷線重連 | P3-03 | 全綠 | blocked | |
