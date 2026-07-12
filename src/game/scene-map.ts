@@ -138,13 +138,14 @@ export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 })
     }
   }
 
-  // Riverbed ford under the dam site — reads as the stream the dam blocks.
+  // Riverbed ford tucked under the dam sprite — grounds the dam in a wet
+  // stream bed without reading as a floating water panel (artist review 07-12).
   tiles.push({
     texture: 'tile_riverbed',
     frame: 1, // the variant with big foundation stones
     x: DAM_SITE.x,
-    y: DAM_SITE.y + 26,
-    size: 236,
+    y: DAM_SITE.y + 22,
+    size: 148,
   });
 
   // Forest wall along the top edge, leaving the dam span open. Frame 1 is the

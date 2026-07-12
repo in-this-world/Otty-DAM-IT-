@@ -119,11 +119,14 @@ export async function processTileSheet(
       .raw()
       .toBuffer({ resolveWithObject: true });
     const m = whiteMargins({ data: new Uint8Array(cellRaw), width: ci.width, height: ci.height });
+    // Inset a further ~2% per edge: AI cells carry a faint edge vignette that
+    // otherwise shows up as grid seams when tiles are drawn side by side.
+    const inset = Math.round(Math.min(ci.width, ci.height) * 0.02);
     const inner = {
-      left: m.left,
-      top: m.top,
-      width: Math.max(1, ci.width - m.left - m.right),
-      height: Math.max(1, ci.height - m.top - m.bottom),
+      left: m.left + inset,
+      top: m.top + inset,
+      width: Math.max(1, ci.width - m.left - m.right - inset * 2),
+      height: Math.max(1, ci.height - m.top - m.bottom - inset * 2),
     };
     const out = await sharp(cellPng)
       .extract(inner)
