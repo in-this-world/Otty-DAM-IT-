@@ -7,6 +7,9 @@
  *   plus static prop/object sheets (obj_*) that live in the same atlas but are
  *   NOT animations (the game references their frames directly). Their frame
  *   list is emitted to objects.json.
+ * Wave 3 (P2-09): scene tiles (T1..T5) -> full-bleed opaque strips in
+ *   public/assets/tiles/ + tiles.json manifest (no keying, not in the atlas),
+ *   and scene decorations (T6) -> obj_decor_* atlas frames.
  *
  * Background removal:
  *   - Wave 1 characters use the global color-key (unchanged, keeps the shipped
@@ -32,6 +35,7 @@ import {
 import { buildPhaserAtlasJson, packFrames, type FrameInput } from './atlas';
 import { chooseCutPoints, occupiedColumns } from './slice';
 import { buildAnimationsManifest, DEFAULT_FRAME_RATE } from './animations';
+import { DEFAULT_TILE_SIZE, TILE_MAP, processTileSheet } from './tiles';
 
 /** Background-removal strategy per source sheet. */
 export type KeyMode = 'global' | 'flood';
@@ -100,6 +104,8 @@ export const OBJECT_MAP: ReadonlyArray<ObjectSheet> = [
   { key: 'obj_splash', sources: ['7. '] }, // bubbles / splash / crown / droplets
   { key: 'obj_dam', sources: ['Dam-1', 'Dam-2'] }, // build stages 1..8 (merged)
   { key: 'obj_star', sources: ['9'] }, // star / cluster / burst / sparkle
+  // P2-09 batch 3: scene decorations (reeds / stump / mossy rock / mushrooms)
+  { key: 'obj_decor', sources: ['T6'] },
 ];
 
 export interface SheetOptions {
@@ -266,6 +272,8 @@ export interface PipelineOptions {
   atlasName?: string;
   maxAtlasWidth?: number;
   padding?: number;
+  /** Output side length for scene tiles (default 192). */
+  tileSize?: number;
 }
 
 export interface PipelineResult {
@@ -281,11 +289,15 @@ export interface PipelineResult {
   bytes: Record<string, number>;
 }
 
-/** Find the file in assetsDir whose name contains `needle` (exactly one match). */
+/**
+ * Find the file in assetsDir for `needle` (exactly one match). A unique
+ * prefix match wins first — "1. " must select "1. 三角錐…" and not
+ * "T1. 草地…" now that the T-series tile sheets share the digits.
+ */
 function resolveOne(entries: string[], needle: string, what: string): string {
-  const matches = entries.filter(
-    (e) => e.includes(needle) && e.toLowerCase().endsWith('.png'),
-  );
+  const pngs = entries.filter((e) => e.toLowerCase().endsWith('.png'));
+  let matches = pngs.filter((e) => e.startsWith(needle));
+  if (matches.length !== 1) matches = pngs.filter((e) => e.includes(needle));
   if (matches.length === 0) throw new Error(`Missing source sheet for ${what} (needle "${needle}")`);
   if (matches.length > 1) {
     throw new Error(`Ambiguous source for ${what} (needle "${needle}"): ${matches.join(', ')}`);
@@ -317,6 +329,15 @@ export function findObjectFiles(assetsDir: string): { key: string; files: string
   return OBJECT_MAP.map(({ key, sources }) => ({
     key,
     files: sources.map((s) => path.join(assetsDir, resolveOne(entries, s, key))),
+  }));
+}
+
+/** Locate each scene tile sheet (T1..T5) in assetsDir. */
+export function findTileFiles(assetsDir: string): { key: string; file: string }[] {
+  const entries = readdirSync(assetsDir);
+  return TILE_MAP.map(({ key, needle }) => ({
+    key,
+    file: path.join(assetsDir, resolveOne(entries, `${needle}.`, key)),
   }));
 }
 
@@ -355,6 +376,42 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineResult
     }
     objectFrames[key] = names;
   }
+
+  // 1c. scene tile sheets (P2-09) -> one opaque strip PNG per sheet + manifest.
+  //     Full-bleed, no color keying; strips (not the padded atlas) so tiles can
+  //     be drawn edge-to-edge without atlas-padding seams.
+  const tileSize = opts.tileSize ?? DEFAULT_TILE_SIZE;
+  const tilesDir = path.join(opts.outDir, 'tiles');
+  mkdirSync(tilesDir, { recursive: true });
+  const tileManifest: Record<string, { frames: number; size: number }> = {};
+  const tileBytes: Record<string, number> = {};
+  for (const { key, file } of findTileFiles(opts.assetsDir)) {
+    const tiles = await processTileSheet(file, tileSize);
+    const strip = await sharp({
+      create: {
+        width: tileSize * tiles.length,
+        height: tileSize,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite(
+        tiles.map((t, i) => ({
+          input: Buffer.from(t.data.buffer, t.data.byteOffset, t.data.byteLength),
+          raw: { width: t.size, height: t.size, channels: 4 as const },
+          left: i * tileSize,
+          top: 0,
+        })),
+      )
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer();
+    const outFile = path.join(tilesDir, `${key}.png`);
+    writeFileSync(outFile, strip);
+    tileManifest[key] = { frames: tiles.length, size: tileSize };
+    tileBytes[`tiles/${key}.png`] = strip.length;
+  }
+  const tilesJson = path.join(opts.outDir, 'tiles.json');
+  writeFileSync(tilesJson, JSON.stringify({ tileSize, tiles: tileManifest }, null, 2));
 
   // 2. pack into a single atlas
   const inputs: FrameInput[] = allFrames.map(({ name, width, height }) => ({ name, width, height }));
@@ -401,8 +458,8 @@ export async function runPipeline(opts: PipelineOptions): Promise<PipelineResult
   );
   writeFileSync(objectsJson, JSON.stringify({ objects: objectFrames }, null, 2));
 
-  const bytes: Record<string, number> = {};
-  for (const f of [atlasPng, atlasJson, animationsJson, objectsJson]) {
+  const bytes: Record<string, number> = { ...tileBytes };
+  for (const f of [atlasPng, atlasJson, animationsJson, objectsJson, tilesJson]) {
     bytes[path.basename(f)] = statSync(f).size;
   }
 

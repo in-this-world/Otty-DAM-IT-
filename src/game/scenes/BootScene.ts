@@ -1,10 +1,12 @@
 /**
  * Boot: load the otter atlas + animation manifest (P0-03 pipeline output),
- * register animations (P1-06), then hand over to GameScene.
- * window.__otty.ready flips true once boot completes (E2E smoke contract).
+ * the P2-09 scene tile strips, register animations (P1-06), then hand over
+ * to GameScene. window.__otty.ready flips true once boot completes (E2E
+ * smoke contract).
  */
 import Phaser from 'phaser';
 import { registerAnimations, type AnimationManifest } from '../anim/registry';
+import { TILE_SHEETS, TILE_SRC_SIZE } from '../scene-map';
 
 export const OTTER_TEXTURE = 'otter';
 
@@ -14,11 +16,15 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
-    // Anchor relative asset URLs to the Vite base ('/' locally, '/Otty-DAM-IT-/'
-    // on GitHub Pages) so the atlas loads under a project sub-path too (P2-deploy).
-    this.load.setBaseURL(import.meta.env.BASE_URL);
     this.load.atlas(OTTER_TEXTURE, 'assets/otter.png', 'assets/otter.json');
     this.load.json('otter-animations', 'assets/animations.json');
+    // P2-09 scene tiles: one strip spritesheet per sheet (see scene-map.ts).
+    for (const key of Object.keys(TILE_SHEETS)) {
+      this.load.spritesheet(key, `assets/tiles/${key}.png`, {
+        frameWidth: TILE_SRC_SIZE,
+        frameHeight: TILE_SRC_SIZE,
+      });
+    }
   }
 
   create(): void {

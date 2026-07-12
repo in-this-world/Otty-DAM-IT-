@@ -16,13 +16,13 @@ const assetsDir = path.join(repoRoot, 'Assets');
 const hasAssets = existsSync(path.join(assetsDir, 'A. 待機 Idle.png'));
 
 // wave 1 (25) + wave 2 actions/NPCs (29) + objects (34) = 88
-const EXPECTED_FRAMES = 88;
+const EXPECTED_FRAMES = 92; // 88 + 4 obj_decor (P2-09 batch 3)
 const EXPECTED_ANIM_KEYS = [
   'bear', 'build', 'carry', 'cone_hat', 'dig', 'dizzy', 'eagle', 'eat',
   'float', 'idle', 'lose', 'pick_stone', 'poke', 'throw', 'walk', 'wash', 'win',
 ];
 const EXPECTED_OBJECT_KEYS = [
-  'obj_cone', 'obj_dam', 'obj_dirt', 'obj_falling', 'obj_fish',
+  'obj_cone', 'obj_dam', 'obj_decor', 'obj_dirt', 'obj_falling', 'obj_fish',
   'obj_splash', 'obj_star', 'obj_stone', 'obj_wood',
 ];
 

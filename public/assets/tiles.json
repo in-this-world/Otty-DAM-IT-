@@ -1,0 +1,25 @@
+{
+  "tileSize": 192,
+  "tiles": {
+    "tile_grass": {
+      "frames": 4,
+      "size": 192
+    },
+    "tile_water": {
+      "frames": 4,
+      "size": 192
+    },
+    "tile_bank": {
+      "frames": 4,
+      "size": 192
+    },
+    "tile_riverbed": {
+      "frames": 2,
+      "size": 192
+    },
+    "tile_forest": {
+      "frames": 3,
+      "size": 192
+    }
+  }
+}

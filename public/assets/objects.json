@@ -51,6 +51,12 @@
       "obj_star_1",
       "obj_star_2",
       "obj_star_3"
+    ],
+    "obj_decor": [
+      "obj_decor_0",
+      "obj_decor_1",
+      "obj_decor_2",
+      "obj_decor_3"
     ]
   }
 }
