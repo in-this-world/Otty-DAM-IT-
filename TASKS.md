@@ -11,10 +11,10 @@
 | ID | 泳道 | 角色 | 任務 | 依賴 | 驗收條件 | 狀態 | Owner |
 |---|---|---|---|---|---|---|---|
 | P0-01 | F | Maintainer | Scaffold:Vite + Phaser 3 + TS + Vitest + Playwright + ESLint;`npm run dev/test/check` 可跑 | — | `npm run check` 綠;dev server 開得起來 | done | Claude 2026-07-02 \4
-| P0-02 | C | Tester | Playwright smoke:開 dev server → BootScene 載入 → `window.__otty.ready === true` → 截圖 | P0-01 | E2E 綠,截圖存基準目錄 | in_progress | Claude 2026-07-02(spec 已寫,待瀏覽器首跑+基準截圖) \4
+| P0-02 | C | Tester | Playwright smoke:開 dev server → BootScene 載入 → `window.__otty.ready === true` → 截圖 | P0-01 | E2E 綠,截圖存基準目錄 | done | boss 確認 2026-07-11 \4
 | P0-03 | D | Developer | 資產管線 `scripts/prepare-assets.ts`:去背→切幀→縮放→atlas;含管線單元測試 | P0-01 | 對 A–G 跑完輸出合法 RGBA atlas + 動畫 JSON;測試綠 | done | Claude 2026-07-02 \4
 | P0-04 | A | Developer | core 骨架:types.ts、command→state→events 迴圈、tick;GameAdapter 介面(local 實作) | P0-01 | unit 測試:空局 tick 不變狀態、指令入列出事件 | done | Claude 2026-07-02 \4
-| P0-05 | F | Maintainer | GitHub Actions CI:push → check + unit + E2E(headless) | P0-01,02 | CI 在 main 上全綠 | in_progress | Claude 2026-07-02(workflow 已寫,待 GitHub remote 首跑) \4
+| P0-05 | F | Maintainer | GitHub Actions CI:push → check + unit + E2E(headless) | P0-01,02 | CI 在 main 上全綠 | done | boss 確認 2026-07-11 \4
 
 ## P1 核心循環(單機一局可玩)
 
@@ -27,22 +27,22 @@
 | P1-05 | B | Developer | GameScene:讀 core 狀態演出;鍵盤輸入→指令;placeholder 圖 | P0-04,P1-01 | 整合測試:場景載入、輸入產生指令 | done | Claude 2026-07-02 \4
 | P1-06 | B | Developer | 動畫接入:A/B/C/G atlas 註冊,狀態→動畫切換 | P0-03,P1-05 | 整合:每動作動畫存在且幀數正確 | done | Claude 2026-07-02 \4
 | P1-07 | B | Developer | HUD:進度條、倒數、勝負畫面 | P1-04,05 | E2E:HUD 數值與 `window.__otty` 一致 | done | Claude 2026-07-02 \4
-| P1-08 | C | Tester | E2E「完整一局」:自動操作撿樹枝蓋壩 → 勝利;放置不動 → 失敗 | P1-07 | 兩條 Playwright 腳本綠 | ready |  \4
+| P1-08 | C | Tester | E2E「完整一局」:自動操作撿樹枝蓋壩 → 勝利;放置不動 → 失敗 | P1-07 | 兩條 Playwright 腳本綠 | done | boss 確認 2026-07-11 \4
 | P1-09 | G | Marketing | 用 Character_1/2 立繪做 itch.io 草稿頁 + 一句話賣點文案(中/英) | — | 草稿存 `marketing/`,Stakeholder 過目 | done | Claude 2026-07-02 \4
 
 ## P2 完整玩法(單機)
 
 | ID | 泳道 | 角色 | 任務 | 依賴 | 驗收條件 | 狀態 | Owner |
 |---|---|---|---|---|---|---|---|
-| P2-01 | A | Developer | 道具全套:魚(吃=加速/丟=暈眩)、石頭(重)、三角錐(帽)、挖土+坑 | P1-02 | 每道具 unit 覆蓋效果與約束 | ready |  \4
+| P2-01 | A | Developer | 道具全套:魚(吃=加速/丟=暈眩)、石頭(重)、三角錐(帽)、挖土+坑 | P1-02 | 每道具 unit 覆蓋效果與約束 | done | Claude 2026-07-03(見 Docs/P2-01_summary.md;板上原漏標) \4
 | P2-02 | A | Developer | 戳人 D:掉物資 + 2s 無敵幀 | P2-01 | unit:被戳掉落、無敵期免疫 | done | Claude 2026-07-03 \4
 | P2-03 | A | Developer | 漂浮 F + 手牽手水獺筏、洗澡去 debuff | P1-01 | unit:入水漂浮、連結成串速度加成 | done | Claude 2026-07-03 \4
 | P2-04 | A | Developer | 突發事件:老鷹(影子預警/三角錐免疫)、熊(丟魚引開),狀態機 | P2-01 | unit:事件狀態機全路徑 | done | Claude 2026-07-04 |
 | P2-05 | A | Developer | AI 水獺:補位行為樹(撿→搬→建),人數平衡 | P1-03 | unit:AI 一人局可在時限內完壩(模擬 tick) | done | Claude 2026-07-03 \4
 | P2-06 | B | Developer | D/E/F 動畫 + 事件演出 + 手機虛擬搖桿雙鍵 | P2-01..04 | E2E:手機 viewport 可完整遊玩 | done | Claude 2026-07-04 |
-| P2-07 | C | Tester | 全機制 E2E 回歸包 + 60fps 效能檢測腳本 | P2-06 | 回歸全綠;效能報告存檔 | blocked | |
+| P2-07 | C | Tester | 全機制 E2E 回歸包 + 60fps 效能檢測腳本 | P2-06 | 回歸全綠;效能報告存檔 | ready | (P2-06 已完成,解除 blocked 2026-07-11) |
 | P2-08 | D | Designer | 缺口資產第一批:樹枝/魚/石頭/三角錐/土塊(規格:RGBA、單幀或 3–4 幀、風格同水獺) | — | 過管線腳本驗證即收 | done | Claude 2026-07-05(wave2 管線:88 幀/17 anims/9 物件組,203 綠+build 綠) |
-| P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | in_progress | Claude 2026-07-05(素材+接線+演出打磨 done〔道具/水壩/NPC/帽/暈勝敗/動作clip/打擊水花特效〕;僅剩場景 tiles 待美術) |
+| P2-09 | D | Designer | 缺口資產第二批:老鷹、熊、場景 tiles、水壩三階段 | P2-08 | 同上 | done | Claude 2026-07-12(場景 tiles T1–T6 過管線+接進 GameScene,見 Docs/P2-09_tiles_summary.md) |
 
 ## P3 連線
 
@@ -69,3 +69,4 @@
 - BUG-01 建造姿勢卡住(build/poke/eat 永久停在該姿勢直到移動)→ **已修**(transientActionSystem+actionMs,wave 8)
 - BUG-02 F 戳不到隊友(POKE_RADIUS 56 太小)→ **已修**(→90,wave 8)
 - FEAT 游泳改為按鍵 hold-to-swim(C)→ **已做**(wave 8);原自動入水漂浮已改為需按住 C
+- **BUG-03 Windows 工作樹檔案尾端損毀(2026-07-12 發現/已修)**:先前某次同步把大量文字檔尾端截斷(位元組數≈行數,CRLF 長度換算 bug),另一批檔案尾端被 NUL 填充。已從 git 還原 66 個純截斷檔、修復其餘;**教訓:在掛載資料夾上「就地編輯/覆寫既有檔」會把檔案截回舊長度,一律在 sandbox 內編輯後以 temp+rename 同步回來。**

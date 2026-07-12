@@ -3,7 +3,8 @@
  *
  * Reads core state via LocalAdapter and renders it — no game rules live here
  * (CLAUDE.md rule 2). Wave-2 art (obj_* props, dam stages, eagle/bear NPCs,
- * dizzy/win/lose clips) is mapped by the pure src/game/render-map module.
+ * dizzy/win/lose clips) is mapped by the pure src/game/render-map module;
+ * the P2-09 tile background comes from the pure src/game/scene-map module.
  *
  * Controls: Arrows/WASD move · E/Space pick up / drop · B build · F poke ·
  * C swim (toggle) · R restart.
@@ -30,6 +31,7 @@ import {
   snapshotFromCodes,
   type InputTracker,
 } from '../input';
+import { DAM_SITE, WATER_FRAME_MS, WATER_RECT, buildSceneLayout } from '../scene-map';
 import { parseGameParams } from '../params';
 import { publishSnapshot } from '../snapshot';
 import { formatTime, progressRatio } from './ui/format';
@@ -48,9 +50,9 @@ const HUMAN_COUNT = 1;
 const DEFAULT_PARTY_SIZE = 3;
 /** AI otters move at this % of normal speed by default (?aiSpeed overrides). */
 const DEFAULT_AI_SPEED_PCT = 55;
-/** Placeholder water zone (P2-03): float + raft + wash-off debuff. Real
- *  level layout arrives with P4 art. */
-const WATER = [{ x: 40, y: 372, width: 250, height: 140 }] as const;
+/** Water zone (P2-03 float/raft/wash) — snapped to the P2-09 tile grid so
+ *  gameplay bounds and the painted river agree (scene-map.WATER_RECT). */
+const WATER = [WATER_RECT] as const;
 
 export class GameScene extends Phaser.Scene {
   private adapter!: GameAdapter;
@@ -105,8 +107,8 @@ export class GameScene extends Phaser.Scene {
       ...(params.hazards ? { hazards: { enabled: true } } : {}),
     });
 
-    this.cameras.main.setBackgroundColor('#2d6a7a');
-    this.createWater();
+    this.cameras.main.setBackgroundColor('#87b558');
+    this.createBackground(params.freeze);
     this.createDam();
     this.createHud();
 
@@ -237,12 +239,44 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** P2-03: render placeholder water zones (otters float + form rafts here). */
-  private createWater(): void {
-    for (const w of WATER) {
+  /** P2-09: painted tile background (grass / river / forest / decor) from the
+   *  pure scene-map layout. Water cells cycle frames unless ?freeze pins them
+   *  (deterministic E2E screenshots). */
+  private createBackground(freeze: boolean): void {
+    if (!this.textures.exists('tile_grass')) {
+      // tile art missing (tests / partial builds): keep the old flat look.
+      for (const w of WATER) {
+        this.add
+          .rectangle(w.x + w.width / 2, w.y + w.height / 2, w.width, w.height, 0x2f8fb0, 0.55)
+          .setStrokeStyle(2, 0x8fdcef);
+      }
+      return;
+    }
+    const layout = buildSceneLayout(WORLD);
+    for (const t of layout.tiles) {
       this.add
-        .rectangle(w.x + w.width / 2, w.y + w.height / 2, w.width, w.height, 0x2f8fb0, 0.55)
-        .setStrokeStyle(2, 0x8fdcef);
+        .image(t.x, t.y, t.texture, t.frame)
+        .setDisplaySize(t.size, t.size)
+        .setFlipX(t.flipX ?? false);
+    }
+    const waterImages = layout.animatedWater.map((t) =>
+      this.add.image(t.x, t.y, t.texture, t.frame).setDisplaySize(t.size, t.size),
+    );
+    if (!freeze && waterImages.length > 0) {
+      let waterFrame = 0;
+      this.time.addEvent({
+        delay: WATER_FRAME_MS,
+        loop: true,
+        callback: () => {
+          waterFrame = (waterFrame + 1) % 4;
+          for (const img of waterImages) img.setFrame(waterFrame);
+        },
+      });
+    }
+    for (const d of layout.decor) {
+      if (!this.hasFrame(d.frame)) continue;
+      const img = this.add.image(d.x, d.y, OTTER_TEXTURE, d.frame);
+      if (img.height > 0) img.setScale(d.height / img.height);
     }
   }
 
@@ -257,7 +291,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createDam(): void {
-    const site = { x: WORLD.width / 2, y: 96 };
+    const site = DAM_SITE;
     this.damZone = this.add
       .rectangle(site.x, site.y, 240, 72, 0x4a3421, 0.2)
       .setStrokeStyle(2, 0xd9b380);

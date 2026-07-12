@@ -1759,6 +1759,86 @@
         "w": 128,
         "h": 128
       }
+    },
+    "obj_decor_0": {
+      "frame": {
+        "x": 520,
+        "y": 1560,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "obj_decor_1": {
+      "frame": {
+        "x": 650,
+        "y": 1560,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "obj_decor_2": {
+      "frame": {
+        "x": 780,
+        "y": 1560,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
+    },
+    "obj_decor_3": {
+      "frame": {
+        "x": 0,
+        "y": 1690,
+        "w": 128,
+        "h": 128
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 128,
+        "h": 128
+      },
+      "sourceSize": {
+        "w": 128,
+        "h": 128
+      }
     }
   },
   "meta": {
@@ -1767,7 +1847,7 @@
     "format": "RGBA8888",
     "size": {
       "w": 908,
-      "h": 1688
+      "h": 1818
     },
     "scale": "1"
   }
