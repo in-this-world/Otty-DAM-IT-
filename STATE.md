@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-12 · by Claude (P2-10~14 播測修正 wave:T丟/G挖/Q吃 綁鍵+手機鍵〔core 指令原本就在,從未映射〕;carry/build 持物疊加 obj_* 小圖;水域 4×2、溪流接河、建造判定改矩形=畫面壩區、魚水中生成+決定性漫游 fishSwimSystem;鷹改抓人〔物品掉原地→載飛2s→丟下冰凍3s,cause 'eagle'〕+F戳/丟魚可驅離鷹熊〔被救者不凍〕;E2E 回歸 mechanics.spec + perf.spec〔P2-07/14 done〕。259 unit 綠+build 綠;凍結截圖基準 CI 自動重生。P2 全部完成,P3-01 解鎖)
 2026-07-12 · by Claude (P2-09 收尾:場景 tiles T1–T6 過管線〔tiles.ts 新模組;strip+tiles.json;T6→obj_decor〕接進 GameScene〔純 scene-map.ts 佈局:草地網格/左下水域+岸邊/壩底河床/頂部森林牆+熊入口/裝飾;WATER_RECT 對齊網格取代佔位水域〕。美術複審於 live 站截圖後微調〔河床 236→148 塞壩底、tile 邊緣內縮 2% 除格線〕。245 綠+build 綠+CI E2E 綠〔基準自動重生〕,資產 ~2.53MB。**另修 BUG-03:Windows 工作樹大規模尾端截斷/NUL 填充——66 檔自 git 還原、其餘手工補尾;成因是掛載資料夾就地覆寫會截回舊長度,規範改為 sandbox 編輯+rsync 回寫**。P2-09 done→P2 全完成;下一步 P2-07 或 P3-01)
 2026-07-05 · by Claude (wave 16 修正:物件切條改「內容感知」——依物件間最寬空隙切〔非等分格〕,修好石頭因跨格被切+去背清縫產生的透明接縫;每物件 trim 緊裁後置中於一致方框,不變形。新增 scripts/lib/slice.ts〔occupiedColumns/chooseCutPoints,+5 測〕+ processObjectSheet 兩段式〔sharp 的 resize 早於 extend,需分兩次〕。in-game 道具尺寸 30→42。229 綠+build 綠)
 2026-07-05 · by Claude+子代理 (wave 15:P2-09 演出打磨——事件驅動的暫態動作動畫〔丟魚/挖土/撿石/洗澡,otter-*幀,過期回退〕+ 打擊/水花特效 sprite〔戳人/熊撞/坑→obj_star,入水/被鷹叼→obj_splash,上浮淡出後自毀〕。兩支純模組 action-anim.ts + effects.ts〔子代理 TDD,零 Phaser〕接進 GameScene〔adapter.onEvents;暫態動畫優先序在 base action 之上、win/lose/dizzy 之下〕。不動 core。`npm run check` 224 綠 + build 綠。凍結截圖不受影響〔無事件〕。僅剩場景 tiles〔待美術〕)
@@ -36,8 +37,8 @@
 
 ## 下一步(建議順序)
 0. **開 feature branch 再動工**;完成且測綠才併回 `main`。任務結束記得補 `Docs/<ID>_summary.md`。
-1. **P2-07(ready)**:全機制 E2E 回歸包 + 60fps 效能檢測腳本。
-2. **P3-01 可解鎖**:P2 全泳道完成,可開 Colyseus server。
+1. **P3-01(解鎖)**:Colyseus server——P2 含播測修正全部完成。
+2. **播測驗收**:boss 實機再玩一輪確認 T/G/Q、鷹抓人、魚游動手感;數值(凍 3s/載 2s/鍵位)可再調。
 3. **P4 打磨候選**:河岸/森林接縫軟過渡、bank 草色調統一、code-split(>500KB chunk 警告)。
 4. **待 boss 決定**:AI 難度預設(2 隻、55% 速)是否調整(水域已定為 WATER_RECT {0,384,288,156})。
 
