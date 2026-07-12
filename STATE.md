@@ -3,6 +3,7 @@
 > 每次 session 結束前必須更新本檔。新 agent 從這裡開始。
 
 ## 最後更新
+2026-07-12 · by Claude (P2-09 收尾:場景 tiles T1–T6 過管線〔tiles.ts 新模組;strip+tiles.json;T6→obj_decor〕接進 GameScene〔純 scene-map.ts 佈局:草地網格/左下水域+岸邊/壩底河床/頂部森林牆+熊入口/裝飾;WATER_RECT 對齊網格取代佔位水域〕。美術複審於 live 站截圖後微調〔河床 236→148 塞壩底、tile 邊緣內縮 2% 除格線〕。245 綠+build 綠+CI E2E 綠〔基準自動重生〕,資產 ~2.53MB。**另修 BUG-03:Windows 工作樹大規模尾端截斷/NUL 填充——66 檔自 git 還原、其餘手工補尾;成因是掛載資料夾就地覆寫會截回舊長度,規範改為 sandbox 編輯+rsync 回寫**。P2-09 done→P2 全完成;下一步 P2-07 或 P3-01)
 2026-07-05 · by Claude (wave 16 修正:物件切條改「內容感知」——依物件間最寬空隙切〔非等分格〕,修好石頭因跨格被切+去背清縫產生的透明接縫;每物件 trim 緊裁後置中於一致方框,不變形。新增 scripts/lib/slice.ts〔occupiedColumns/chooseCutPoints,+5 測〕+ processObjectSheet 兩段式〔sharp 的 resize 早於 extend,需分兩次〕。in-game 道具尺寸 30→42。229 綠+build 綠)
 2026-07-05 · by Claude+子代理 (wave 15:P2-09 演出打磨——事件驅動的暫態動作動畫〔丟魚/挖土/撿石/洗澡,otter-*幀,過期回退〕+ 打擊/水花特效 sprite〔戳人/熊撞/坑→obj_star,入水/被鷹叼→obj_splash,上浮淡出後自毀〕。兩支純模組 action-anim.ts + effects.ts〔子代理 TDD,零 Phaser〕接進 GameScene〔adapter.onEvents;暫態動畫優先序在 base action 之上、win/lose/dizzy 之下〕。不動 core。`npm run check` 224 綠 + build 綠。凍結截圖不受影響〔無事件〕。僅剩場景 tiles〔待美術〕)
 2026-07-05 · by Claude (wave 14:第二批美術接進 GameScene——道具改 obj_* 貼圖〔樹枝/魚/石頭/錐/土〕、水壩改 obj_dam 分階段〔進度 0→3、勝利換裝飾幀 5〕、老鷹/熊改真動畫 sprite〔體型 熊>>獺>>鷹,鷹留地面影子預警〕、三角錐帽套頭、暈眩〔stunnedMs>0〕/勝利/失敗動畫。新增純模組 src/game/render-map.ts〔state→幀/動畫映射,零 Phaser〕+6 測含契約測〔映射的幀/動畫都存在於 atlas〕。不動 core。`npm run check` 209 綠 + build 綠。E2E:凍結截圖〔boot/mobile,hazards=0〕因道具/水壩改貼圖會變,CI 於 main 自動重生 linux 基準〔首跑紅一次後補基準即綠〕)
@@ -20,7 +21,7 @@
 
 ## 專案現況
 - **P0 完成、P1 一局可玩、P2 單機玩法核心齊備。** `npm run check` 綠:**203 測試全過** + `vite build` 綠。**第二批美術(P2-08)已過管線併入圖集,詳見 wave 13。****P2-01 道具、P2-02 戳人、P2-03 漂浮/筏/洗澡、P2-04 突發事件(老鷹+熊)、P2-05 AI、P2-06 手機操作+事件演出+D/E/F 動畫 全部完成並接進 GameScene**(hazards 預設開、`?hazards=0` 關)。**自動部署上線:push main → GitHub Actions → GitHub Pages(https://in-this-world.github.io/Otty-DAM-IT-/)。**
-- GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(已 push;**Actions 尚未看到 run,待排查**)。
+- GitHub remote:https://github.com/in-this-world/Otty-DAM-IT-(CI + Pages 部署皆正常,E2E 基準會於 main 自動重生)。
 - 遊戲可跑:`npm run dev` → Boot(atlas+動畫註冊)→ GameScene:1P + 撒滿樹枝的場地,WASD/方向鍵移動、E/空白鍵撿放、B 建造、180s 倒數、勝負 overlay、R 重開。
 - git repo 已建(main,7 commits,任務 ID 開頭)。**分支策略(新):每組功能開 feature branch(如 `feat/P2-props`),測試全綠才併回 `main`;`main` 永遠保持可玩、綠燈。** **注意:repo 在 sandbox 開發後同步回本資料夾,Windows 端首次使用建議 `git status` 確認(可能有 CRLF 造成的假差異,`git add --renormalize .` 可解)。**
 
@@ -34,12 +35,11 @@
 - `Docs/` — 每任務一份摘要(P0-01…P1-09)。
 
 ## 下一步(建議順序)
-0. **開 feature branch 再動工**(如 `feat/e2e-run`);完成且測綠才併回 `main`。任務結束記得補 `Docs/<ID>_summary.md`。
-1. **跑 E2E(`npm run e2e`,預期 5 tests):MCP 已修好,agent 現在可直接在 sandbox 用瀏覽器 MCP 跑**,驗證 P0-02(smoke + HUD)與 P1-08 完整一局 bot(win + lose)。綠了把 P0-02、P1-08 標 done 並補基準截圖。
-2. **CI 排查**(P0-05):repo → Actions tab;若顯示停用 → Settings→Actions→General 開啟;若無 run → push 任一新 commit 觸發。首跑 e2e job 會因缺 linux 基準截圖紅(預期),照 Docs/P0-02_P0-05_summary.md 補基準。
-3. `ready` 可認領:剩 P2-08(美術缺口第一批,需真人美術)。P2-02/P2-03/P2-05 皆已完成並接線(見 Docs)。
-4. **E2E 首跑**(唯一主要待辦):`npm run e2e` 用瀏覽器 MCP 首跑,補 linux 基準截圖;E2E 已 pin `?ai=0` 維持單獺確定性。
-5. **P2-06/P2-08 打磨**:戳人/漂浮/水獺筏專屬動畫+事件演出、手機虛擬搖桿;缺口美術第一批。
+0. **開 feature branch 再動工**;完成且測綠才併回 `main`。任務結束記得補 `Docs/<ID>_summary.md`。
+1. **P2-07(ready)**:全機制 E2E 回歸包 + 60fps 效能檢測腳本。
+2. **P3-01 可解鎖**:P2 全泳道完成,可開 Colyseus server。
+3. **P4 打磨候選**:河岸/森林接縫軟過渡、bank 草色調統一、code-split(>500KB chunk 警告)。
+4. **待 boss 決定**:AI 難度預設(2 隻、55% 速)是否調整(水域已定為 WATER_RECT {0,384,288,156})。
 
 ## Decisions log(跨泳道決策記錄於此)
 - 2026-07-02:採 command→state→events + GameAdapter 介面,單機/連線共用 core(MASTER_PLAN §2.1)
