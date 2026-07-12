@@ -40,6 +40,14 @@ import type {
 export const EAGLE_WARNING_MS = 3000;
 /** Short dive/leave beat after the grab resolves, ms (visual only). */
 export const EAGLE_SWOOP_MS = 400;
+/** P2-13: how long the eagle carries a grabbed otter, ms. */
+export const EAGLE_CARRY_MS = 2000;
+/** P2-13: freeze applied when the carried otter is dropped, ms. */
+export const EAGLE_FREEZE_MS = 3000;
+/** P2-13: flight speed while carrying, world units/sec. */
+export const EAGLE_FLY_SPEED_PER_SEC = 180;
+/** P2-13: keep the drop point this far inside the world bounds. */
+export const EAGLE_DROP_MARGIN = 48;
 
 /** Bear walk speed, world units/sec (slower than an otter's 200). */
 export const BEAR_SPEED_PER_SEC = 120;
@@ -157,6 +165,76 @@ interface StepResult<T> {
   readonly items?: Record<string, ItemState>;
 }
 
+/** P2-13: pick where a grabbed otter gets dropped — away from the dam. */
+export function eagleDropPoint(state: GameState, grabAt: Vec2): Vec2 {
+  let dx = grabAt.x - state.dam.site.x;
+  let dy = grabAt.y - state.dam.site.y;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) {
+    dx = 0;
+    dy = 1;
+  } else {
+    dx /= len;
+    dy /= len;
+  }
+  const m = EAGLE_DROP_MARGIN;
+  return {
+    x: Math.min(state.world.width - m, Math.max(m, grabAt.x + dx * 260)),
+    y: Math.min(state.world.height - m, Math.max(m, grabAt.y + dy * 260)),
+  };
+}
+
+/** P2-13: release the carried otter at the eagle's position. */
+function releaseVictim(
+  state: GameState,
+  eagle: EagleState,
+  freezeMs: number,
+  events: GameEvent[],
+): { otters?: Record<string, OtterState> } {
+  const victim = eagle.victimId ? state.otters[eagle.victimId] : undefined;
+  if (!victim) return {};
+  const pos = { ...eagle.pos };
+  const otters: Record<string, OtterState> = {
+    ...state.otters,
+    [victim.id]: {
+      ...victim,
+      pos,
+      vel: { x: 0, y: 0 },
+      action: 'idle',
+      stunnedMs: Math.max(victim.stunnedMs, freezeMs),
+    },
+  };
+  events.push({ type: 'otterDropped', playerId: victim.id, pos });
+  if (freezeMs > 0) {
+    events.push({ type: 'otterStunned', playerId: victim.id, durationMs: freezeMs, cause: 'eagle' });
+  }
+  return { otters };
+}
+
+/**
+ * P2-13: drive the eagle off (poke / thrown fish). A carried otter is
+ * released on the spot WITHOUT the freeze (the rescue is the reward).
+ */
+export function repelEagle(
+  state: GameState,
+  eagle: EagleState,
+  by: string,
+  events: GameEvent[],
+): StepResult<EagleState> {
+  const r = eagle.phase === 'carry' ? releaseVictim(state, eagle, 0, events) : {};
+  events.push({ type: 'hazardRepelled', kind: 'eagle', by });
+  return {
+    hazard: { phase: 'swoop', targetId: eagle.targetId, pos: eagle.pos, timerMs: EAGLE_SWOOP_MS },
+    ...(r.otters ? { otters: r.otters } : {}),
+  };
+}
+
+/** P2-13: drive the bear off (poke / thrown fish) — it turns and leaves. */
+export function repelBear(bear: BearState, by: string, events: GameEvent[]): BearState {
+  events.push({ type: 'hazardRepelled', kind: 'bear', by });
+  return { ...bear, phase: 'leaving', timerMs: BEAR_LEAVE_MS, targetOtterId: null, targetItemId: null };
+}
+
 /** Advance the eagle one tick. May mutate a returned otters/items draft. */
 export function stepEagle(
   state: GameState,
@@ -167,6 +245,42 @@ export function stepEagle(
   if (eagle.phase === 'swoop') {
     const timerMs = eagle.timerMs - dtMs;
     return { hazard: timerMs > 0 ? { ...eagle, timerMs } : null };
+  }
+
+  if (eagle.phase === 'carry') {
+    const timerMs = eagle.timerMs - dtMs;
+    const step = (EAGLE_FLY_SPEED_PER_SEC * dtMs) / 1000;
+    const dropAt = eagle.dropAt ?? eagle.pos;
+    const pos = moveToward(eagle.pos, dropAt, step);
+    const victim = eagle.victimId ? state.otters[eagle.victimId] : undefined;
+    const arrived = pos.x === dropAt.x && pos.y === dropAt.y;
+    const flying: EagleState = { ...eagle, pos, timerMs };
+
+    if (!victim) {
+      // victim vanished (shouldn't happen) -> just leave
+      return { hazard: { phase: 'swoop', targetId: eagle.targetId, pos, timerMs: EAGLE_SWOOP_MS } };
+    }
+    if (timerMs <= 0 || arrived) {
+      const r = releaseVictim({ ...state, otters: state.otters }, flying, EAGLE_FREEZE_MS, events);
+      return {
+        hazard: { phase: 'swoop', targetId: eagle.targetId, pos, timerMs: EAGLE_SWOOP_MS },
+        ...(r.otters ? { otters: r.otters } : {}),
+      };
+    }
+    // Mid-flight: the victim dangles from the eagle (position follows, no control).
+    const otters: Record<string, OtterState> = {
+      ...state.otters,
+      [victim.id]: {
+        ...victim,
+        pos,
+        vel: { x: 0, y: 0 },
+        action: 'idle',
+        wantsBuild: false,
+        buildingMs: 0,
+        stunnedMs: Math.max(victim.stunnedMs, 250),
+      },
+    };
+    return { hazard: flying, otters };
   }
 
   // phase === 'warning'
@@ -188,7 +302,7 @@ export function stepEagle(
 
   // Immune: target gone, wearing a cone, or dodging in water.
   const immune = !target || target.hat === 'cone' || target.floating === true;
-  if (immune || target.carrying === null) {
+  if (immune) {
     events.push({
       type: 'eagleSwooped',
       targetId: eagle.targetId,
@@ -198,20 +312,41 @@ export function stepEagle(
     return { hazard: swoop };
   }
 
-  // Snatch the carried item: it is carried off (removed from the world).
+  // P2-13: GRAB THE OTTER. Its held item drops at the grab point, then the
+  // eagle carries it toward the drop point for EAGLE_CARRY_MS.
   const items: Record<string, ItemState> = { ...state.items };
-  const held = heldItemOf(items, target.id);
   let itemId: string | null = null;
-  if (held) {
-    itemId = held.id;
-    delete items[held.id];
+  if (target.carrying !== null) {
+    const held = heldItemOf(items, target.id);
+    if (held) {
+      itemId = held.id;
+      items[held.id] = { ...held, heldBy: null, pos: target.pos };
+      events.push({ type: 'itemDropped', playerId: target.id, itemId: held.id, itemType: held.type });
+    }
   }
   const otters: Record<string, OtterState> = {
     ...state.otters,
-    [target.id]: { ...target, carrying: null },
+    [target.id]: {
+      ...target,
+      carrying: null,
+      wantsBuild: false,
+      buildingMs: 0,
+      vel: { x: 0, y: 0 },
+      action: 'idle',
+      stunnedMs: Math.max(target.stunnedMs, 250),
+    },
   };
   events.push({ type: 'eagleSwooped', targetId: target.id, itemId, grabbed: true });
-  return { hazard: swoop, otters, items };
+  events.push({ type: 'otterGrabbed', playerId: target.id, pos: target.pos });
+  const carry: EagleState = {
+    phase: 'carry',
+    targetId: eagle.targetId,
+    victimId: target.id,
+    pos: target.pos,
+    timerMs: EAGLE_CARRY_MS,
+    dropAt: eagleDropPoint(state, target.pos),
+  };
+  return { hazard: carry, otters, items };
 }
 
 /* ------------------------------ bear machine ---------------------------- */

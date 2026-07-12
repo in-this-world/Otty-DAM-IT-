@@ -11,7 +11,8 @@
  * Command side only; the invuln timer decays passively in effects.ts.
  */
 import { TRANSIENT_ACTION_HOLD_MS } from './action';
-import type { GameEvent, GameState, ItemState, OtterState } from './types';
+import { repelBear, repelEagle } from './hazards';
+import type { GameEvent, GameState, HazardsState, ItemState, OtterState } from './types';
 
 /** Reach of a poke, world units. */
 export const POKE_RADIUS = 90;
@@ -57,8 +58,10 @@ export function applyPoke(state: GameState, otter: OtterState, events: GameEvent
   });
 
   if (!target) {
+    // P2-13: no otter in reach — a poke can still drive off a hazard.
+    const repelled = pokeHazards(state, otter, events);
     events.push({ type: 'otterPoked', attackerId: otter.id, targetId: null });
-    return withAttacker(state);
+    return withAttacker(repelled);
   }
 
   events.push({ type: 'otterPoked', attackerId: otter.id, targetId: target.id });
@@ -115,4 +118,35 @@ export function applyPoke(state: GameState, otter: OtterState, events: GameEvent
   events.push({ type: 'otterStunned', playerId: target.id, durationMs: POKE_STUN_MS, cause: 'poke' });
 
   return { ...state, otters, items };
+}
+
+/**
+ * P2-13: poke vs hazards — an eagle in reach (diving or carrying someone)
+ * gets driven off (its captive is released, freeze-free); a bear in reach
+ * turns and leaves. Returns the (possibly updated) state.
+ */
+function pokeHazards(state: GameState, otter: OtterState, events: GameEvent[]): GameState {
+  const h = state.hazards;
+  if (!h) return state;
+  const near = (p: { x: number; y: number }): boolean =>
+    Math.hypot(p.x - otter.pos.x, p.y - otter.pos.y) <= POKE_RADIUS;
+
+  let eagle = h.eagle;
+  let bear = h.bear;
+  let otters = state.otters;
+  let changed = false;
+
+  if (eagle && (eagle.phase === 'swoop' || eagle.phase === 'carry') && near(eagle.pos)) {
+    const r = repelEagle(state, eagle, otter.id, events);
+    eagle = r.hazard;
+    if (r.otters) otters = r.otters;
+    changed = true;
+  }
+  if (bear && bear.phase === 'approach' && near(bear.pos)) {
+    bear = repelBear(bear, otter.id, events);
+    changed = true;
+  }
+  if (!changed) return state;
+  const hazards: HazardsState = { eagle, bear, schedule: h.schedule };
+  return { ...state, otters, hazards };
 }

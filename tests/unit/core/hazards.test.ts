@@ -4,8 +4,14 @@
  * the reduce() pipeline wiring.
  */
 import { describe, expect, it } from 'vitest';
+import { applyPoke } from '../../../src/core/poke';
+import { applyThrow } from '../../../src/core/items';
 import {
   BEAR_EAT_RADIUS,
+  EAGLE_CARRY_MS,
+  EAGLE_FREEZE_MS,
+  eagleDropPoint,
+  repelEagle,
   BEAR_LEAVE_MS,
   BEAR_LIFETIME_MS,
   BEAR_STUN_MS,
@@ -97,15 +103,17 @@ describe('P2-04 eagle', () => {
     expect(r.hazard!.timerMs).toBe(EAGLE_WARNING_MS - 50);
   });
 
-  it('swoop snatches the carried item (grabbed=true) and removes it from the world', () => {
+  it('P2-13: the swoop GRABS the otter — held item drops at the grab point, carry begins', () => {
     const s = oneOtter({ pos: { x: 300, y: 300 }, carries: true });
     const eagle: EagleState = { phase: 'warning', targetId: 'otter-1', pos: { x: 300, y: 300 }, timerMs: 20 };
     const events: GameEvent[] = [];
     const r = stepEagle(s, eagle, 50, events);
-    expect(r.hazard!.phase).toBe('swoop');
+    expect(r.hazard!.phase).toBe('carry');
+    expect(r.hazard!.victimId).toBe('otter-1');
     expect(r.otters!['otter-1']!.carrying).toBeNull();
-    expect(r.items!['b1']).toBeUndefined(); // carried off
+    expect(r.items!['b1']).toMatchObject({ heldBy: null, pos: { x: 300, y: 300 } }); // dropped, not stolen
     expect(events.some((e) => e.type === 'eagleSwooped' && e.grabbed === true && e.itemId === 'b1')).toBe(true);
+    expect(events.some((e) => e.type === 'otterGrabbed' && e.playerId === 'otter-1')).toBe(true);
   });
 
   it('a target wearing a cone is immune (grabbed=false, keeps item)', () => {
@@ -128,12 +136,13 @@ describe('P2-04 eagle', () => {
     expect(s.items['b1']).toBeDefined();
   });
 
-  it('an empty-handed target loses nothing (grabbed=false)', () => {
+  it('P2-13: an empty-handed target is still grabbed (no item drops)', () => {
     const s = oneOtter({ pos: { x: 300, y: 300 }, carries: false });
     const eagle: EagleState = { phase: 'warning', targetId: 'otter-1', pos: { x: 300, y: 300 }, timerMs: 20 };
     const events: GameEvent[] = [];
-    stepEagle(s, eagle, 50, events);
-    expect(events.some((e) => e.type === 'eagleSwooped' && e.grabbed === false && e.itemId === null)).toBe(true);
+    const r = stepEagle(s, eagle, 50, events);
+    expect(r.hazard!.phase).toBe('carry');
+    expect(events.some((e) => e.type === 'eagleSwooped' && e.grabbed === true && e.itemId === null)).toBe(true);
   });
 
   it('the swoop beat despawns the eagle after EAGLE_SWOOP_MS', () => {
@@ -284,17 +293,105 @@ describe('P2-04 hazard scheduler + system', () => {
     };
 
     const seen: GameEvent['type'][] = [];
-    // 3200ms of ticks: ~100ms to spawn + 3000ms warning + swoop
-    for (let i = 0; i < 70; i++) {
+    // ~6s of ticks: spawn + 3000ms warning + 2000ms carry (P2-13) + swoop
+    for (let i = 0; i < 120; i++) {
       const r = reduce(s, [], 50);
       s = r.state;
       for (const e of r.events) seen.push(e.type);
     }
     expect(seen).toContain('eagleWarning');
     expect(seen).toContain('eagleSwooped');
-    expect(s.otters['otter-1']!.carrying).toBeNull(); // item snatched
-    expect(s.items['b1']).toBeUndefined();
+    expect(seen).toContain('otterGrabbed');
+    expect(seen).toContain('otterDropped');
+    expect(s.otters['otter-1']!.carrying).toBeNull(); // dropped at the grab point
+    expect(s.items['b1']).toMatchObject({ heldBy: null }); // P2-13: stays in the world
+    expect(s.otters['otter-1']!.stunnedMs).toBeGreaterThan(0); // frozen after the drop
     expect(s.hazards!.eagle).toBeNull(); // whole machine ran to completion
     expect(s.hazards!.schedule).toHaveLength(0);
+  });
+});
+
+/* --------------------------- P2-13 grab + repel -------------------------- */
+
+describe('P2-13 eagle carry / drop / repel', () => {
+  const grabAt = { x: 300, y: 300 };
+
+  function carriedState(): { s: GameState; eagle: EagleState } {
+    const s = oneOtter({ pos: grabAt, carries: false });
+    const eagle: EagleState = {
+      phase: 'carry',
+      targetId: 'otter-1',
+      victimId: 'otter-1',
+      pos: grabAt,
+      timerMs: EAGLE_CARRY_MS,
+      dropAt: eagleDropPoint(s, grabAt),
+    };
+    return { s, eagle };
+  }
+
+  it('carries the victim along (position follows, controls blocked)', () => {
+    const { s, eagle } = carriedState();
+    const r = stepEagle(s, eagle, 50, []);
+    expect(r.hazard!.phase).toBe('carry');
+    expect(r.hazard!.pos).not.toEqual(grabAt); // flying toward dropAt
+    expect(r.otters!['otter-1']!.pos).toEqual(r.hazard!.pos); // dangling
+    expect(r.otters!['otter-1']!.stunnedMs).toBeGreaterThan(0);
+  });
+
+  it('drops the victim after EAGLE_CARRY_MS with the freeze applied', () => {
+    const { s, eagle } = carriedState();
+    const events: GameEvent[] = [];
+    const r = stepEagle(s, { ...eagle, timerMs: 10 }, 50, events);
+    expect(r.hazard!.phase).toBe('swoop'); // leave beat
+    expect(r.otters!['otter-1']!.stunnedMs).toBe(EAGLE_FREEZE_MS);
+    expect(events.some((e) => e.type === 'otterDropped')).toBe(true);
+    expect(
+      events.some((e) => e.type === 'otterStunned' && e.cause === 'eagle' && e.durationMs === EAGLE_FREEZE_MS),
+    ).toBe(true);
+  });
+
+  it('repelEagle releases the captive WITHOUT the freeze and emits hazardRepelled', () => {
+    const { s, eagle } = carriedState();
+    const events: GameEvent[] = [];
+    const r = repelEagle(s, eagle, 'otter-2', events);
+    expect(r.hazard!.phase).toBe('swoop');
+    expect(r.otters!['otter-1']!.stunnedMs).toBe(0);
+    expect(events.some((e) => e.type === 'hazardRepelled' && e.kind === 'eagle')).toBe(true);
+    expect(events.some((e) => e.type === 'otterDropped')).toBe(true);
+    expect(events.some((e) => e.type === 'otterStunned')).toBe(false);
+  });
+
+  it('a poke with no otter in reach drives off a nearby diving eagle and an approaching bear', () => {
+    let s = oneOtter({ pos: grabAt, carries: false });
+    const eagle: EagleState = { phase: 'swoop', targetId: null, pos: { x: 320, y: 310 }, timerMs: 400 };
+    const bear: BearState = {
+      phase: 'approach', pos: { x: 340, y: 280 }, targetOtterId: null, targetItemId: null, timerMs: 9000,
+    };
+    s = { ...s, hazards: { eagle, bear, schedule: [] } };
+    const events: GameEvent[] = [];
+    const after = applyPoke(s, s.otters['otter-1']!, events);
+    expect(after.hazards!.bear!.phase).toBe('leaving');
+    expect(events.filter((e) => e.type === 'hazardRepelled')).toHaveLength(2);
+  });
+
+  it('a thrown fish crossing the bear repels it', () => {
+    let s = oneOtter({
+      pos: { x: 300, y: 300 },
+      items: [{ id: 'f1', type: 'fish', pos: { x: 300, y: 300 } }],
+    });
+    s = {
+      ...s,
+      otters: { 'otter-1': { ...s.otters['otter-1']!, carrying: 'fish', facing: 'right' } },
+      items: { f1: { id: 'f1', type: 'fish', pos: { x: 300, y: 300 }, heldBy: 'otter-1' } },
+      hazards: {
+        eagle: null,
+        bear: { phase: 'approach', pos: { x: 380, y: 300 }, targetOtterId: null, targetItemId: null, timerMs: 9000 },
+        schedule: [],
+      },
+    };
+    const events: GameEvent[] = [];
+    const after = applyThrow(s, s.otters['otter-1']!, events, () => {});
+    expect(after.hazards!.bear!.phase).toBe('leaving');
+    expect(events.some((e) => e.type === 'hazardRepelled' && e.kind === 'bear')).toBe(true);
   });
 });

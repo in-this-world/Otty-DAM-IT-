@@ -10,6 +10,7 @@
  * The passive side (buff/stun decay, pit collisions) lives in effects.ts.
  */
 import { TRANSIENT_ACTION_HOLD_MS } from './action';
+import { repelBear, repelEagle } from './hazards';
 import type { GameEvent, GameState, ItemState, OtterState, Vec2 } from './types';
 
 /* Tuning constants (P2-01 owns these numbers; see Docs/P2-01_summary.md). */
@@ -239,6 +240,33 @@ export function applyThrow(
     applyStun(otters, items, victimId, THROWN_FISH_STUN_MS, 'thrownFish', state.tick, events);
   }
 
+  // P2-13: a thrown fish crossing a hazard drives it off. The eagle releases
+  // its captive freeze-free; the bear turns and leaves (a landed fish still
+  // lures it away as before).
+  let hazards = state.hazards;
+  if (held.type === 'fish' && hazards) {
+    let eagle = hazards.eagle;
+    let bear = hazards.bear;
+    let changed = false;
+    if (eagle && (eagle.phase === 'swoop' || eagle.phase === 'carry')) {
+      const { d } = distToSegment(eagle.pos, from, to);
+      if (d <= THROW_HIT_RADIUS + 20) {
+        const r = repelEagle({ ...state, otters }, eagle, otter.id, events);
+        eagle = r.hazard;
+        if (r.otters) Object.assign(otters, r.otters);
+        changed = true;
+      }
+    }
+    if (bear && bear.phase === 'approach') {
+      const { d } = distToSegment(bear.pos, from, to);
+      if (d <= THROW_HIT_RADIUS + 24) {
+        bear = repelBear(bear, otter.id, events);
+        changed = true;
+      }
+    }
+    if (changed) hazards = { eagle, bear, schedule: hazards.schedule };
+  }
+
   items[held.id] = { ...held, heldBy: null, pos: to };
   otters[otter.id] = { ...otter, carrying: null, action: actionAfterHands(otter) };
   events.push({
@@ -249,7 +277,7 @@ export function applyThrow(
     from,
     to,
   });
-  return { ...state, otters, items };
+  return { ...state, otters, items, ...(hazards !== state.hazards ? { hazards } : {}) };
 }
 
 /**

@@ -29,7 +29,7 @@ export interface OttySnapshot {
   readonly items: readonly SnapshotItem[];
   /** P2-06: active sudden-event hazards (null when none / disabled). */
   readonly hazards: {
-    readonly eagle: { readonly phase: 'warning' | 'swoop'; readonly x: number; readonly y: number } | null;
+    readonly eagle: { readonly phase: 'warning' | 'swoop' | 'carry'; readonly x: number; readonly y: number } | null;
     readonly bear: { readonly phase: 'approach' | 'leaving'; readonly x: number; readonly y: number } | null;
   } | null;
 }

@@ -39,7 +39,8 @@ function rectContaining(water: readonly Rect[], pos: Vec2): Rect | null {
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
 /** Per-tick system: drift every free in-water fish along its epoch heading. */
-export function fishSwimSystem(state: GameState, dtMs: number, _events: GameEvent[]): GameState {
+export function fishSwimSystem(state: GameState, dtMs: number, events: GameEvent[]): GameState {
+  void events; // System signature; fish drift emits no events.
   const water = state.water;
   if (!water || water.length === 0) return state;
   if (state.phase !== 'playing') return state;
@@ -53,10 +54,9 @@ export function fishSwimSystem(state: GameState, dtMs: number, _events: GameEven
     const rect = rectContaining(water, it.pos);
     if (!rect) continue;
     const angle = hash01(it.id, epoch) * Math.PI * 2;
-    const maxY = Math.min(rect.y + rect.height, /* world floor guard */ rect.y + rect.height);
     const pos: Vec2 = {
       x: clamp(it.pos.x + Math.cos(angle) * step, rect.x + FISH_MARGIN, rect.x + rect.width - FISH_MARGIN),
-      y: clamp(it.pos.y + Math.sin(angle) * step, rect.y + FISH_MARGIN, maxY - FISH_MARGIN),
+      y: clamp(it.pos.y + Math.sin(angle) * step, rect.y + FISH_MARGIN, rect.y + rect.height - FISH_MARGIN),
     };
     if (pos.x === it.pos.x && pos.y === it.pos.y) continue;
     if (!items) items = { ...state.items };

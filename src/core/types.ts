@@ -30,7 +30,7 @@ export type ItemType = 'branch' | 'fish' | 'stone' | 'cone' | 'dirt';
 export type HatType = 'cone';
 
 /** Why an otter got stunned (drives distinct SFX/anim in the game layer). */
-export type StunCause = 'thrownFish' | 'pit' | 'poke' | 'bear';
+export type StunCause = 'thrownFish' | 'pit' | 'poke' | 'bear' | 'eagle';
 
 /** One value per spritesheet action (MASTER_PLAN §3.1). */
 export type OtterAction = 'idle' | 'walk' | 'carry' | 'poke' | 'eat' | 'float' | 'build';
@@ -102,17 +102,23 @@ export type HazardKind = 'eagle' | 'bear';
 /**
  * 🦅 Eagle. Casts a shadow warning over a marked otter for a few seconds,
  * then swoops: if the target is protected (wears a cone) or dodging (in
- * water) it comes up empty; otherwise it snatches the item from their paws.
- * Machine: 'warning' -> 'swoop' -> (removed).
+ * water) it comes up empty; otherwise it GRABS the otter (P2-13), carries it
+ * for a couple of seconds (held item drops at the grab point), then drops it
+ * frozen. Poking it (or a thrown fish) forces an early, freeze-free drop.
+ * Machine: 'warning' -> [carry ->] 'swoop' (leave beat) -> (removed).
  */
 export interface EagleState {
-  readonly phase: 'warning' | 'swoop';
+  readonly phase: 'warning' | 'swoop' | 'carry';
   /** Otter marked at spawn; the swoop resolves against this id. */
   readonly targetId: string | null;
   /** Shadow / bird position (tracks the target during 'warning'). */
   readonly pos: Vec2;
   /** Remaining time in the current phase, ms. */
   readonly timerMs: number;
+  /** Otter being carried during 'carry' (P2-13), else null/undefined. */
+  readonly victimId?: string | null;
+  /** Where the carried otter gets dropped (P2-13). */
+  readonly dropAt?: Vec2;
 }
 
 /**
@@ -267,6 +273,9 @@ export type GameEvent =
     }
   | { readonly type: 'bearLured'; readonly itemId: string }
   | { readonly type: 'bearLeft' }
+  | { readonly type: 'otterGrabbed'; readonly playerId: string; readonly pos: Vec2 }
+  | { readonly type: 'otterDropped'; readonly playerId: string; readonly pos: Vec2 }
+  | { readonly type: 'hazardRepelled'; readonly kind: HazardKind; readonly by: string }
   | { readonly type: 'tickCompleted'; readonly tick: number };
 
 export type GameEventType = GameEvent['type'];
