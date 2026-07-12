@@ -19,6 +19,7 @@ import {
   CONE_HAT_FRAME,
   NPC,
   damStageFrame,
+  heldOverlayFrame,
   itemFrame,
   otterAnimKey,
 } from '../render-map';
@@ -44,6 +45,7 @@ const WORLD = { width: 960, height: 540 };
 const OTTER_DISPLAY_HEIGHT = 96;
 const ITEM_DISPLAY_HEIGHT = 42;
 const CONE_HAT_HEIGHT = 34;
+const HELD_ITEM_HEIGHT = 30;
 const DAM_DISPLAY_HEIGHT = 104;
 const EFFECT_DISPLAY_HEIGHT = 40;
 /** Local solo play spawns AI teammates to fill out a small party (P2-05). */
@@ -68,6 +70,8 @@ export class GameScene extends Phaser.Scene {
 
   private otterSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private coneHats = new Map<string, Phaser.GameObjects.Sprite>();
+  /** P2-11: small held-item sprite over the paws (fish/stone/dirt). */
+  private heldOverlays = new Map<string, Phaser.GameObjects.Sprite>();
   private itemSprites = new Map<string, Phaser.GameObjects.Sprite>();
   private damZone!: Phaser.GameObjects.Rectangle;
   private damSprite!: Phaser.GameObjects.Sprite;
@@ -190,7 +194,35 @@ export class GameScene extends Phaser.Scene {
         sprite.play(key);
       }
       this.renderConeHat(o.id, o.hat === 'cone', o.pos.x, o.pos.y);
+      this.renderHeldItem(o.id, o.carrying, o.pos.x, o.pos.y, o.facing === 'left');
     }
+  }
+
+  /** P2-11: carry/build art bakes in a branch — overlay other materials. */
+  private renderHeldItem(
+    id: string,
+    carrying: import('../../core/types').ItemType | null,
+    x: number,
+    y: number,
+    facingLeft: boolean,
+  ): void {
+    const frame = heldOverlayFrame(carrying);
+    let overlay = this.heldOverlays.get(id);
+    if (!frame) {
+      overlay?.setVisible(false);
+      return;
+    }
+    if (!overlay) {
+      if (!this.hasFrame(frame)) return;
+      overlay = this.add.sprite(x, y, OTTER_TEXTURE, frame);
+      this.heldOverlays.set(id, overlay);
+    }
+    if (overlay.frame.name !== frame) overlay.setFrame(frame);
+    overlay.setScale(HELD_ITEM_HEIGHT / (overlay.frame.height || HELD_ITEM_HEIGHT));
+    overlay
+      .setVisible(true)
+      .setFlipX(facingLeft)
+      .setPosition(x + (facingLeft ? -26 : 26), y + 10);
   }
 
   /** Whether the atlas actually has a frame (guards against art gaps). */
@@ -430,6 +462,7 @@ export class GameScene extends Phaser.Scene {
     this.teardown();
     this.otterSprites.clear();
     this.coneHats.clear();
+    this.heldOverlays.clear();
     this.itemSprites.clear();
     this.overlay = null;
     this.eagleShadow = this.eagleSprite = null;

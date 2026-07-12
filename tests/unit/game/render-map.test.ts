@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { ItemType, OtterState } from '../../../src/core/types';
 import {
   CONE_HAT_FRAME,
+  heldOverlayFrame,
   DAM_WON_FRAME,
   NPC,
   damStageFrame,
@@ -82,5 +83,16 @@ describe('render-map (P2-08/09 wiring)', () => {
       expect(objs.objects['obj_fish']).toContain('obj_fish_0');
       expect(objs.objects['obj_dam']).toContain('obj_dam_5');
     });
+  });
+});
+
+describe('P2-11 heldOverlayFrame', () => {
+  it('maps fish/stone/dirt to obj_ frames; branch/cone/null have no overlay', () => {
+    expect(heldOverlayFrame('fish')).toBe('obj_fish_0');
+    expect(heldOverlayFrame('stone')).toBe('obj_stone_2');
+    expect(heldOverlayFrame('dirt')).toBe('obj_dirt_0');
+    expect(heldOverlayFrame('branch')).toBeNull(); // baked into the carry art
+    expect(heldOverlayFrame('cone')).toBeNull(); // worn as a hat instead
+    expect(heldOverlayFrame(null)).toBeNull();
   });
 });

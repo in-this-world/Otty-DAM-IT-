@@ -25,6 +25,24 @@ export function itemFrame(type: ItemType): string {
 /** Cone hat overlay frame (drawn above the head when an otter wears a cone). */
 export const CONE_HAT_FRAME = 'obj_cone_0';
 
+/**
+ * P2-11: the carry/build art has a BRANCH painted in, so carrying fish /
+ * stone / dirt needs a small held-item sprite overlaid on the paws. Branch
+ * returns null (already in the art); the cone is worn as a hat, not held.
+ */
+export function heldOverlayFrame(carrying: ItemType | null): string | null {
+  switch (carrying) {
+    case 'fish':
+      return 'obj_fish_0';
+    case 'stone':
+      return 'obj_stone_2';
+    case 'dirt':
+      return 'obj_dirt_0';
+    default:
+      return null;
+  }
+}
+
 /** Number of linear dam build stages baked into obj_dam (frames 0..3). */
 export const DAM_BUILD_STAGES = 4;
 /** Celebratory "decorated" dam frame shown on a win (obj_dam_5). */
