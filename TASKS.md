@@ -53,10 +53,11 @@
 
 | ID | 泳道 | 角色 | 任務 | 依賴 | 驗收條件 | 狀態 | Owner |
 |---|---|---|---|---|---|---|---|
-| P3-01 | E | Developer | Colyseus server:room schema、core 搬上伺服器跑、20Hz tick | P2 全 A 泳道(含 P2-10..13) | server unit 測試綠 | blocked | |
-| P3-02 | E | Developer | ColyseusAdapter 實作 GameAdapter;客戶端預測+插值 | P3-01 | 整合:local 與 colyseus adapter 過同一套測試 | blocked | |
-| P3-03 | B | Developer | 大廳/準備室/連結加房 `r/ABCD`、中途 spectate | P3-02 | E2E:兩個 browser context 同房互戳 | blocked | |
-| P3-04 | C | Tester | 多人 E2E:2 人合作勝利、10 人房、斷線重連 | P3-03 | 全綠 | blocked | |
+| P3-01 | E | Developer | Colyseus server:room schema、core 搬上伺服器跑、20Hz tick | P2 全 A 泳道(含 P2-10..13) | server unit 測試綠 | done | Claude 2026-07-13(RoomSimulation 純核心@20Hz+DamRoom+LobbySchema;13 測) |
+| P3-02 | E | Developer | ColyseusAdapter 實作 GameAdapter;客戶端預測+插值 | P3-01 | 整合:local 與 colyseus adapter 過同一套測試 | done | Claude 2026-07-13(prediction+interpolation;共用契約 local/colyseus 皆過+tick-parity;14 測) |
+| P3-03 | B | Developer | 大廳/準備室/連結加房 `r/ABCD`、中途 spectate + 連線狀態 UX | P3-02 | E2E:兩個 browser context 同房互戳 | done* | Claude 2026-07-13(LobbyController+DOM 準備室+join link+spectate;5 測。*雙瀏覽器 E2E 待 host) |
+| P3-04 | C | Tester | 多人測試:2 人合作勝利、10 人房、斷線重連 | P3-03 | 全綠 | done* | Claude 2026-07-13(in-process 多人整合 3 測全綠;301 unit+build 綠。*真 host 雙瀏覽器待) |
+| P3-05 | B | Developer | 準備室 personalization:暱稱(localStorage)+帽/圍巾顏色+頭頂名牌、免登入 | P3-02 | 暱稱/顏色持久化、名牌顯示 | done | Claude 2026-07-13(protocol PlayerProfile+profile-store+接進準備室;5 測) |
 
 ## P4 打磨 / P5 上線(摘要,屆時由 PM 展開細項)
 
