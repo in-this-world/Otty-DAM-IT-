@@ -59,6 +59,10 @@ const WATER = [WATER_RECT] as const;
 
 export class GameScene extends Phaser.Scene {
   private adapter!: GameAdapter;
+  /** Local otter id for input; null when spectating (P3-03). */
+  private localId: string | null = PLAYER_ID;
+  /** True when driven by an injected networked adapter (P3-02/03). */
+  private networked = false;
   private unsubscribe: Unsubscribe | null = null;
   private eventsUnsub: Unsubscribe | null = null;
   /** Per-otter one-shot animation override (throw/dig/pick_stone/wash). */
@@ -101,16 +105,25 @@ export class GameScene extends Phaser.Scene {
     for (let i = HUMAN_COUNT + 1; i <= HUMAN_COUNT + aiCount; i++) {
       speedByOtter[`otter-${i}`] = aiSpeed;
     }
-    this.adapter = new LocalAdapter({
-      playerCount: HUMAN_COUNT + aiCount,
-      seed: params.seed ?? (Date.now() % 0xffffffff) >>> 0,
-      world: WORLD,
-      water: WATER,
-      speedByOtter,
-      timerMs: params.timer ?? 180_000,
-      ...(params.required !== null ? { damRequiredPerPlayer: params.required } : {}),
-      ...(params.hazards ? { hazards: { enabled: true } } : {}),
-    });
+    // P3: a networked ColyseusAdapter may be injected by the lobby overlay via
+    // the Phaser registry; otherwise run a single-machine LocalAdapter as before.
+    const injected = this.game.registry.get('netAdapter') as GameAdapter | undefined;
+    if (injected) {
+      this.adapter = injected;
+      this.networked = true;
+      this.localId = (this.game.registry.get('netLocalId') as string | null) ?? null;
+    } else {
+      this.adapter = new LocalAdapter({
+        playerCount: HUMAN_COUNT + aiCount,
+        seed: params.seed ?? (Date.now() % 0xffffffff) >>> 0,
+        world: WORLD,
+        water: WATER,
+        speedByOtter,
+        timerMs: params.timer ?? 180_000,
+        ...(params.required !== null ? { damRequiredPerPlayer: params.required } : {}),
+        ...(params.hazards ? { hazards: { enabled: true } } : {}),
+      });
+    }
 
     this.cameras.main.setBackgroundColor('#87b558');
     this.createBackground(params.freeze);
@@ -123,7 +136,7 @@ export class GameScene extends Phaser.Scene {
     this.unsubscribe = this.adapter.onState((state) => {
       this.latest = state;
       publishSnapshot(state);
-      this.driveAi(state);
+      if (!this.networked) this.driveAi(state);
     });
     // P2-09 juice: transient action clips + impact/splash effect sprites.
     this.eventsUnsub = this.adapter.onEvents((events) => this.handleEvents(events));
@@ -142,27 +155,33 @@ export class GameScene extends Phaser.Scene {
     } else {
       this.adapter.start();
     }
-    this.latest = this.adapter.getState();
-    publishSnapshot(this.latest);
+    try {
+      this.latest = this.adapter.getState();
+      publishSnapshot(this.latest);
+    } catch {
+      // Networked: no snapshot until the first server tick arrives.
+    }
   }
 
   update(): void {
     const state = this.latest;
     if (!state) return;
 
-    const me = state.otters[PLAYER_ID];
+    const me = this.localId ? state.otters[this.localId] : undefined;
     const snapshot = mergeSnapshots(
       snapshotFromCodes(this.codesDown),
       this.mobileControls.snapshot(),
     );
-    const { commands, tracker } = deriveCommands(
-      this.tracker,
-      snapshot,
-      PLAYER_ID,
-      (me?.carrying ?? null) !== null,
-    );
-    this.tracker = tracker;
-    for (const command of commands) this.adapter.sendCommand(command);
+    if (this.localId) {
+      const { commands, tracker } = deriveCommands(
+        this.tracker,
+        snapshot,
+        this.localId,
+        (me?.carrying ?? null) !== null,
+      );
+      this.tracker = tracker;
+      for (const command of commands) this.adapter.sendCommand(command);
+    }
 
     this.renderOtters(state);
     this.renderItems(state);

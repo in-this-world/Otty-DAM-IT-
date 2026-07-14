@@ -1,14 +1,14 @@
 /**
- * Real colyseus.js transport (P3-02). Untested glue — hosting is deferred —
- * but type-checked and kept thin. Wraps a joined Colyseus room in the
- * NetTransport the ColyseusAdapter expects.
+ * Real colyseus.js transport (P3-02/03). Untested glue — hosting is deferred —
+ * but type-checked and thin. `joinRoom` gets a live room (used by the lobby to
+ * read the synced roster); `transportForRoom` wraps it in the NetTransport the
+ * ColyseusAdapter drives once play begins.
  *
  * The `welcome` is synthesized from the first LobbySchema sync (room.sessionId
- * -> that player's otterId), sidestepping the classic join/handler race where
- * an onJoin-sent message can beat the client's onMessage registration.
+ * -> that player's otterId), sidestepping the join/handler race where an
+ * onJoin-sent message can beat the client's onMessage registration.
  *
- * Room-code join relies on the server defining `filterBy(['roomCode'])` on the
- * `dam` room so joinOrCreate lands in the matching room (or makes it).
+ * Room-code join relies on the server defining `filterBy(['roomCode'])`.
  */
 import { Client, type Room } from 'colyseus.js';
 import { ServerMessage, type PlayerProfile, type WelcomePayload } from './protocol';
@@ -28,16 +28,25 @@ interface LobbyLike {
   players: { get(id: string): { otterId?: string; spectator?: boolean } | undefined };
 }
 
-/** Connect to a Colyseus `dam` room and return a NetTransport for the adapter. */
-export async function connectColyseus(opts: ConnectOptions): Promise<NetTransport> {
+/** Join (or create) the Colyseus `dam` room and return the live Room. */
+export async function joinRoom(opts: ConnectOptions): Promise<Room> {
   const client = new Client(opts.url);
   const roomName = opts.roomName ?? 'dam';
   const joinOptions = {
     profile: opts.profile,
     ...(opts.roomCode ? { roomCode: opts.roomCode } : {}),
   };
-  const room = await client.joinOrCreate(roomName, joinOptions);
+  return client.joinOrCreate(roomName, joinOptions);
+}
+
+/** Wrap a joined room in the adapter's NetTransport. */
+export function transportForRoom(room: Room): NetTransport {
   return new ColyseusTransport(room);
+}
+
+/** Convenience: join + wrap in one call (used when no lobby UI is needed). */
+export async function connectColyseus(opts: ConnectOptions): Promise<NetTransport> {
+  return transportForRoom(await joinRoom(opts));
 }
 
 class ColyseusTransport implements NetTransport {
@@ -50,8 +59,6 @@ class ColyseusTransport implements NetTransport {
     const list = this.handlers.get(type) ?? [];
     list.push(handler);
     this.handlers.set(type, list);
-    // Welcome is synthesized locally (see open()); everything else is a real
-    // server message we forward straight through.
     if (type !== ServerMessage.Welcome) {
       this.room.onMessage(type, (m) => handler(m));
     }

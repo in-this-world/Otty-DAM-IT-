@@ -1,0 +1,241 @@
+/**
+ * 大廳 / 準備室 DOM overlay (P3-03 + P3-05). Rendered outside Phaser so it can
+ * show before the game boots and during reconnects. Pure-logic bits it leans
+ * on (code validation, connection state, profile persistence) are unit-tested;
+ * this file is the untested DOM glue that wires them to a Colyseus room.
+ *
+ * Flow: pick nickname + colours (persisted, no login) -> Create or Join r/ABCD
+ * -> 準備室 roster with ready toggles + a share link -> owner starts -> resolve
+ * with a connected ColyseusAdapter for GameScene. Late joiners spectate.
+ */
+import type { GameAdapter } from '../../core/adapter';
+import { ColyseusAdapter } from '../../net/ColyseusAdapter';
+import { joinRoom, transportForRoom } from '../../net/colyseus-connect';
+import { LobbyController } from '../../net/lobby-controller';
+import {
+  ClientMessage,
+  joinLink,
+  PLAYER_COLORS,
+  type PlayerProfile,
+} from '../../net/protocol';
+import { cycleColor, loadProfile, saveProfile } from '../../net/profile-store';
+
+export interface LobbyResult {
+  readonly adapter: GameAdapter;
+  readonly localPlayerId: string | null;
+  readonly spectator: boolean;
+  readonly roomCode: string;
+}
+
+interface RosterPlayer {
+  otterId?: string;
+  nickname?: string;
+  hatColor?: string;
+  scarfColor?: string;
+  ready?: boolean;
+  connected?: boolean;
+  spectator?: boolean;
+  owner?: boolean;
+}
+interface LobbyStateLike {
+  roomCode?: string;
+  phase?: string;
+  players: { forEach(cb: (p: RosterPlayer, key: string) => void): void; get(k: string): RosterPlayer | undefined };
+}
+
+const el = <K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  props: Partial<HTMLElementTagNameMap[K]> = {},
+  style: Partial<CSSStyleDeclaration> = {},
+): HTMLElementTagNameMap[K] => {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  Object.assign(node.style, style);
+  return node;
+};
+
+export interface LobbyOptions {
+  readonly serverUrl: string;
+  /** Pre-filled room code from a #/r/ABCD deep link. */
+  readonly initialCode?: string | null;
+  readonly storage?: Storage;
+}
+
+export class LobbyOverlay {
+  private readonly root: HTMLDivElement;
+  private readonly controller = new LobbyController();
+  private profile: PlayerProfile;
+  private resolve!: (r: LobbyResult) => void;
+
+  constructor(private readonly opts: LobbyOptions) {
+    this.profile = loadProfile(opts.storage ?? safeLocalStorage());
+    this.root = el('div', { id: 'otty-lobby' }, {
+      position: 'fixed', inset: '0', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', background: 'rgba(20,40,48,0.92)', zIndex: '1000',
+      fontFamily: 'system-ui, sans-serif', color: '#eef',
+    });
+  }
+
+  /** Show the lobby; resolves once the round starts with a connected adapter. */
+  run(): Promise<LobbyResult> {
+    document.body.appendChild(this.root);
+    this.renderSetup();
+    return new Promise<LobbyResult>((res) => (this.resolve = res));
+  }
+
+  /* --------- screen 1: personalization + create/join --------- */
+  private renderSetup(): void {
+    this.root.replaceChildren();
+    const card = this.card('水獺蓋水壩 · 連線大廳');
+
+    const nick = el('input', {
+      value: this.profile.nickname, maxLength: 12, placeholder: '暱稱',
+    }, { padding: '8px', fontSize: '16px', borderRadius: '8px', border: 'none', width: '100%' });
+    nick.oninput = () => (this.profile = saveProfile(this.storage, { ...this.profile, nickname: nick.value }));
+    card.append(this.field('暱稱', nick));
+
+    card.append(this.colorRow('帽子顏色', 'hatColor'));
+    card.append(this.colorRow('圍巾顏色', 'scarfColor'));
+
+    const code = el('input', {
+      value: this.opts.initialCode ?? '', placeholder: '房號 (ABCD)', maxLength: 4,
+    }, { padding: '8px', fontSize: '16px', borderRadius: '8px', border: 'none', width: '100%', textTransform: 'uppercase' });
+    card.append(this.field('加入房號', code));
+
+    const banner = el('div', {}, { minHeight: '20px', fontSize: '14px', color: '#f88' });
+    const create = this.button('建立房間', () => void this.connect(null, banner));
+    const join = this.button('加入房間', () => {
+      const v = this.controller.validateJoin(code.value);
+      if (!v.ok) { banner.textContent = '房號格式錯誤 (需 4 個字母)'; return; }
+      void this.connect(v.code!, banner);
+    });
+    const btns = el('div', {}, { display: 'flex', gap: '8px', marginTop: '12px' });
+    btns.append(create, join);
+    card.append(btns, banner);
+    this.root.append(card);
+  }
+
+  private colorRow(label: string, key: 'hatColor' | 'scarfColor'): HTMLElement {
+    const swatch = el('button', {}, {
+      width: '32px', height: '32px', borderRadius: '50%', border: '2px solid #fff',
+      background: this.profile[key], cursor: 'pointer',
+    });
+    swatch.onclick = () => {
+      this.profile = saveProfile(this.storage, { ...this.profile, [key]: cycleColor(this.profile[key]) });
+      swatch.style.background = this.profile[key];
+    };
+    const row = el('div', {}, { display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' });
+    row.append(el('span', { textContent: label }, { flex: '1' }), swatch);
+    return row;
+  }
+
+  /* --------- screen 2: 準備室 roster --------- */
+  private async connect(roomCode: string | null, banner: HTMLElement): Promise<void> {
+    if (!this.controller.beginConnect(roomCode)) return;
+    banner.style.color = '#8cf';
+    banner.textContent = '連線中…';
+    try {
+      const room = await joinRoom({ url: this.opts.serverUrl, roomCode: roomCode ?? undefined, profile: this.profile });
+      const state = () => room.state as unknown as LobbyStateLike;
+      const me = () => state().players.get(room.sessionId);
+
+      const transport = transportForRoom(room);
+      const adapter = new ColyseusAdapter(transport);
+
+      room.onStateChange(() => {
+        const s = state();
+        this.controller.onWelcome({
+          playerId: me()?.otterId ?? null,
+          roomCode: s.roomCode ?? '',
+          spectator: Boolean(me()?.spectator),
+        });
+        if (s.phase === 'playing' || s.phase === 'ended') {
+          adapter.start();
+          this.close();
+          this.resolve({
+            adapter,
+            localPlayerId: me()?.otterId ?? null,
+            spectator: Boolean(me()?.spectator),
+            roomCode: s.roomCode ?? '',
+          });
+        } else {
+          this.renderReadyRoom(room, state);
+        }
+      });
+      room.onLeave(() => this.controller.onDisconnect());
+    } catch {
+      this.controller.onError('ROOM_NOT_FOUND');
+      banner.style.color = '#f88';
+      banner.textContent = '無法連線到伺服器,請稍後再試';
+    }
+  }
+
+  private renderReadyRoom(room: { sessionId: string; send(t: string, m?: unknown): void }, state: () => LobbyStateLike): void {
+    this.root.replaceChildren();
+    const s = state();
+    const card = this.card(`準備室 · 房號 ${s.roomCode ?? '----'}`);
+
+    const list = el('div', {}, { margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '6px' });
+    s.players.forEach((p) => {
+      const row = el('div', {}, { display: 'flex', alignItems: 'center', gap: '8px' });
+      row.append(
+        el('span', {}, { width: '14px', height: '14px', borderRadius: '50%', background: p.hatColor ?? '#888' }),
+        el('span', { textContent: `${p.nickname ?? '水獺'}${p.owner ? ' 👑' : ''}${p.spectator ? ' (觀戰)' : ''}` }, { flex: '1' }),
+        el('span', { textContent: p.spectator ? '' : p.ready ? '✅' : '…' }),
+      );
+      list.append(row);
+    });
+    card.append(list);
+
+    const share = el('input', {
+      value: `${location.origin}${location.pathname}${joinLink(s.roomCode ?? '')}`, readOnly: true,
+    }, { width: '100%', padding: '6px', borderRadius: '6px', border: 'none', fontSize: '12px' });
+    card.append(this.field('分享連結', share));
+
+    const mine = state().players.get(room.sessionId);
+    if (mine && !mine.spectator) {
+      card.append(this.button(mine.ready ? '取消準備' : '準備', () => room.send(ClientMessage.SetReady, { ready: !mine.ready })));
+      if (mine.owner) card.append(this.button('開始遊戲', () => room.send(ClientMessage.StartGame)));
+    } else if (mine?.spectator) {
+      card.append(el('div', { textContent: '你將以觀戰身分加入' }, { marginTop: '8px', color: '#8cf' }));
+    }
+    this.root.append(card);
+  }
+
+  /* --------- helpers --------- */
+  private get storage(): Storage | undefined {
+    return this.opts.storage ?? safeLocalStorage();
+  }
+  private card(title: string): HTMLDivElement {
+    const c = el('div', {}, {
+      background: '#1b3b45', padding: '24px', borderRadius: '16px', width: '320px',
+      boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
+    });
+    c.append(el('h2', { textContent: title }, { margin: '0 0 12px', fontSize: '20px' }));
+    return c;
+  }
+  private field(label: string, input: HTMLElement): HTMLElement {
+    const wrap = el('label', {}, { display: 'block', margin: '8px 0', fontSize: '13px' });
+    wrap.append(el('div', { textContent: label }, { marginBottom: '4px', opacity: '0.8' }), input);
+    return wrap;
+  }
+  private button(label: string, onClick: () => void): HTMLButtonElement {
+    const b = el('button', { textContent: label }, {
+      flex: '1', padding: '10px', fontSize: '15px', borderRadius: '10px', border: 'none',
+      background: PLAYER_COLORS[2], color: '#fff', cursor: 'pointer', marginTop: '6px', width: '100%',
+    });
+    b.onclick = onClick;
+    return b;
+  }
+  private close(): void {
+    this.root.remove();
+  }
+}
+
+function safeLocalStorage(): Storage | undefined {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : undefined;
+  } catch {
+    return undefined;
+  }
+}
