@@ -10,7 +10,7 @@ import { DamRoom } from './DamRoom';
 const port = Number(process.env.PORT ?? 2567);
 
 const gameServer = new Server();
-gameServer.define('dam', DamRoom);
+gameServer.define('dam', DamRoom).filterBy(['roomCode']);
 
 void gameServer.listen(port).then(() => {
   console.log(`[otty] Colyseus server listening on :${port}`);
