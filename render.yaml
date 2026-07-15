@@ -1,0 +1,15 @@
+# Render Blueprint — Otty "DAM IT!" Colyseus multiplayer server (P3).
+# Deploy: Render Dashboard -> New -> Blueprint -> select this repo (main branch).
+# The static client stays on GitHub Pages; only this server runs here.
+services:
+  - type: web
+    name: otty-dam-server
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install
+    startCommand: npm run start:server
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

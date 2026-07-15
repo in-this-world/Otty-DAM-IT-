@@ -30,6 +30,11 @@ jobs:
         run: npx tsc --noEmit
       - name: Build (Pages base path)
         run: npx vite build --base=/Otty-DAM-IT-/
+        env:
+          # Set repo Variable VITE_COLYSEUS_URL (Settings -> Secrets and
+          # variables -> Actions -> Variables) to your Render wss:// URL to
+          # enable multiplayer on the deployed site. Empty -> single-player.
+          VITE_COLYSEUS_URL: ${{ vars.VITE_COLYSEUS_URL }}
       - uses: actions/configure-pages@v5
         with:
           enablement: true
