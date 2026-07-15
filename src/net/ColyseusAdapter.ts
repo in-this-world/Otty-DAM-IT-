@@ -51,6 +51,8 @@ export interface ColyseusAdapterOptions {
   readonly predict?: boolean;
   /** Injectable clock start (tests). Defaults to 0 and advances by render dt. */
   readonly startNowMs?: number;
+  /** Local otter id (from the lobby roster). Enables prediction without a welcome. */
+  readonly localPlayerId?: string | null;
 }
 
 export class ColyseusAdapter implements GameAdapter {
@@ -78,6 +80,7 @@ export class ColyseusAdapter implements GameAdapter {
     this.renderScheduler = opts.renderScheduler ?? new IntervalScheduler(DEFAULT_RENDER_MS);
     this.predict = opts.predict ?? true;
     this.nowMs = opts.startNowMs ?? 0;
+    if (opts.localPlayerId !== undefined) this._localPlayerId = opts.localPlayerId;
 
     this.transport.onMessage(ServerMessage.Welcome, (msg) => {
       const w = msg as WelcomePayload;

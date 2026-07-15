@@ -1,12 +1,13 @@
 /**
  * DamRoom — thin Colyseus glue over the pure RoomSimulation (P3-01).
  *
- * Pinned to Colyseus 0.16 (schema v3) so the server matches the colyseus.js
- * 0.16 client — 0.17 uses schema v4 and can't handshake with the 0.16 client.
+ * No Colyseus schema state: the lobby roster rides a `roster` message and the
+ * game rides `snapshot` messages (both plain serializable payloads from
+ * RoomSimulation). This sidesteps @colyseus/schema entirely — no v3/v4 or
+ * decorator-metadata fragility — and keeps ONE source of truth (the sim).
  *
- * Colyseus owns transport + the reconnection primitive; RoomSimulation owns
- * all game logic. Not exercised by Vitest (needs a live server); the tested
- * sim carries the logic. Type-checked by `npm run check`.
+ * Pinned to Colyseus 0.16 to match the colyseus.js 0.16 client. Not exercised
+ * by Vitest (needs a live server); the tested sim carries the logic.
  */
 import { Room, ServerError } from 'colyseus';
 import type { Client } from 'colyseus';
@@ -17,9 +18,9 @@ import {
   ServerMessage,
   type ClientCommand,
   type PlayerProfile,
+  type RosterPayload,
 } from '../net/protocol';
 import { RoomSimulation } from '../net/room-sim';
-import { LobbySchema, PlayerSchema } from './schema';
 
 export interface DamRoomOptions {
   readonly seed?: number;
@@ -27,7 +28,7 @@ export interface DamRoomOptions {
   readonly timerMs?: number;
 }
 
-export class DamRoom extends Room<LobbySchema> {
+export class DamRoom extends Room {
   /** Hard clients cap; spectators are allowed on top of the 10 otters. */
   maxClients = 50;
   private sim!: RoomSimulation;
@@ -40,24 +41,19 @@ export class DamRoom extends Room<LobbySchema> {
       ...(options.roomCode ? { roomCode: options.roomCode } : {}),
       ...(options.timerMs !== undefined ? { timerMs: options.timerMs } : {}),
     });
-
-    const state = new LobbySchema();
-    state.roomCode = this.sim.roomCode;
-    this.setState(state);
     void this.setMetadata({ roomCode: this.sim.roomCode });
 
     this.onMessage(ClientMessage.SetProfile, (client, msg: Partial<PlayerProfile>) => {
       this.sim.setProfile(client.sessionId, msg);
-      this.syncRoster();
+      this.broadcastRoster();
     });
     this.onMessage(ClientMessage.SetReady, (client, msg: { ready?: boolean }) => {
       this.sim.setReady(client.sessionId, Boolean(msg?.ready));
-      this.syncRoster();
+      this.broadcastRoster();
     });
     this.onMessage(ClientMessage.StartGame, (client) => {
       if (this.sim.start(client.sessionId)) {
-        this.state.phase = 'playing';
-        this.syncRoster();
+        this.broadcastRoster();
         this.startLoop();
       }
     });
@@ -73,13 +69,13 @@ export class DamRoom extends Room<LobbySchema> {
       roomCode: this.sim.roomCode,
       spectator: res.spectator,
     });
-    this.syncRoster();
+    this.broadcastRoster();
   }
 
   override async onLeave(client: Client, consented?: boolean): Promise<void> {
     const wasPlaying = this.sim.phase === 'playing';
     this.sim.disconnect(client.sessionId);
-    this.syncRoster();
+    this.broadcastRoster();
 
     if (wasPlaying && !consented) {
       try {
@@ -88,7 +84,7 @@ export class DamRoom extends Room<LobbySchema> {
       } catch {
         // Reconnection window elapsed; the sim removes the otter as it ticks.
       }
-      this.syncRoster();
+      this.broadcastRoster();
     }
   }
 
@@ -98,30 +94,31 @@ export class DamRoom extends Room<LobbySchema> {
     this.setSimulationInterval((dtMs) => {
       const snap = this.sim.step(dtMs);
       if (!snap) return;
-      this.state.tick = snap.state.tick;
       this.broadcast(ServerMessage.Snapshot, snap);
-      if (this.sim.phase === 'ended' && this.state.phase !== 'ended') {
-        this.state.phase = 'ended';
-      }
+      if (this.sim.phase === 'ended') this.broadcastRoster();
     }, DEFAULT_TICK_MS);
   }
 
-  /** Rebuild the synced roster from the authoritative sim. */
-  private syncRoster(): void {
-    const players = this.state.players;
-    players.clear();
-    for (const p of this.sim.roster()) {
-      const ps = new PlayerSchema();
-      ps.otterId = p.otterId ?? '';
-      ps.nickname = p.profile.nickname;
-      ps.hatColor = p.profile.hatColor;
-      ps.scarfColor = p.profile.scarfColor;
-      ps.ready = p.ready;
-      ps.connected = p.connected;
-      ps.spectator = p.spectator;
-      ps.owner = p.sessionId === this.sim.ownerId;
-      players.set(p.sessionId, ps);
-    }
+  private rosterPayload(): RosterPayload {
+    return {
+      roomCode: this.sim.roomCode,
+      phase: this.sim.phase,
+      players: this.sim.roster().map((p) => ({
+        sessionId: p.sessionId,
+        otterId: p.otterId,
+        nickname: p.profile.nickname,
+        hatColor: p.profile.hatColor,
+        scarfColor: p.profile.scarfColor,
+        ready: p.ready,
+        connected: p.connected,
+        spectator: p.spectator,
+        owner: p.sessionId === this.sim.ownerId,
+      })),
+    };
+  }
+
+  private broadcastRoster(): void {
+    this.broadcast(ServerMessage.Roster, this.rosterPayload());
   }
 }
 

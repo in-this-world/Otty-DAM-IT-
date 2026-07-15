@@ -152,6 +152,8 @@ export const ClientMessage = {
 export const ServerMessage = {
   /** Assigned identity on join (which otter this client controls). */
   Welcome: 'welcome',
+  /** Low-frequency lobby roster + phase (replaces Colyseus schema sync). */
+  Roster: 'roster',
   /** Full authoritative game snapshot for one tick (during play). */
   Snapshot: 'snapshot',
   /** An error the client should surface in the connection UX. */
@@ -172,6 +174,26 @@ export interface WelcomePayload {
 export interface SnapshotPayload {
   readonly state: GameState;
   readonly events: readonly GameEvent[];
+}
+
+/** One player row in the lobby roster (P3-03/05). */
+export interface RosterEntry {
+  readonly sessionId: string;
+  readonly otterId: string | null;
+  readonly nickname: string;
+  readonly hatColor: string;
+  readonly scarfColor: string;
+  readonly ready: boolean;
+  readonly connected: boolean;
+  readonly spectator: boolean;
+  readonly owner: boolean;
+}
+
+/** Broadcast whenever the roster or phase changes (message, not schema). */
+export interface RosterPayload {
+  readonly roomCode: string;
+  readonly phase: 'lobby' | 'playing' | 'ended';
+  readonly players: readonly RosterEntry[];
 }
 
 export interface ErrorPayload {

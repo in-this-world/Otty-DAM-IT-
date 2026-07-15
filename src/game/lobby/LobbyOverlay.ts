@@ -16,7 +16,10 @@ import {
   ClientMessage,
   joinLink,
   PLAYER_COLORS,
+  ServerMessage,
   type PlayerProfile,
+  type RosterEntry,
+  type RosterPayload,
 } from '../../net/protocol';
 import { cycleColor, loadProfile, saveProfile } from '../../net/profile-store';
 
@@ -25,22 +28,6 @@ export interface LobbyResult {
   readonly localPlayerId: string | null;
   readonly spectator: boolean;
   readonly roomCode: string;
-}
-
-interface RosterPlayer {
-  otterId?: string;
-  nickname?: string;
-  hatColor?: string;
-  scarfColor?: string;
-  ready?: boolean;
-  connected?: boolean;
-  spectator?: boolean;
-  owner?: boolean;
-}
-interface LobbyStateLike {
-  roomCode?: string;
-  phase?: string;
-  players: { forEach(cb: (p: RosterPlayer, key: string) => void): void; get(k: string): RosterPlayer | undefined };
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -136,30 +123,33 @@ export class LobbyOverlay {
     banner.textContent = '連線中…';
     try {
       const room = await joinRoom({ url: this.opts.serverUrl, roomCode: roomCode ?? undefined, profile: this.profile });
-      const state = () => room.state as unknown as LobbyStateLike;
-      const me = () => state().players.get(room.sessionId);
+      const mine = (r: RosterPayload): RosterEntry | undefined =>
+        r.players.find((p) => p.sessionId === room.sessionId);
+      let started = false;
 
-      const transport = transportForRoom(room);
-      const adapter = new ColyseusAdapter(transport);
-
-      room.onStateChange(() => {
-        const s = state();
+      room.onMessage(ServerMessage.Roster, (payload: RosterPayload) => {
+        if (started) return;
+        const me = mine(payload);
         this.controller.onWelcome({
-          playerId: me()?.otterId ?? null,
-          roomCode: s.roomCode ?? '',
-          spectator: Boolean(me()?.spectator),
+          playerId: me?.otterId ?? null,
+          roomCode: payload.roomCode,
+          spectator: Boolean(me?.spectator),
         });
-        if (s.phase === 'playing' || s.phase === 'ended') {
+        if (payload.phase === 'playing' || payload.phase === 'ended') {
+          started = true;
+          const adapter = new ColyseusAdapter(transportForRoom(room), {
+            localPlayerId: me?.otterId ?? null,
+          });
           adapter.start();
           this.close();
           this.resolve({
             adapter,
-            localPlayerId: me()?.otterId ?? null,
-            spectator: Boolean(me()?.spectator),
-            roomCode: s.roomCode ?? '',
+            localPlayerId: me?.otterId ?? null,
+            spectator: Boolean(me?.spectator),
+            roomCode: payload.roomCode,
           });
         } else {
-          this.renderReadyRoom(room, state);
+          this.renderReadyRoom(room, payload);
         }
       });
       room.onLeave(() => this.controller.onDisconnect());
@@ -170,29 +160,31 @@ export class LobbyOverlay {
     }
   }
 
-  private renderReadyRoom(room: { sessionId: string; send(t: string, m?: unknown): void }, state: () => LobbyStateLike): void {
+  private renderReadyRoom(
+    room: { sessionId: string; send(t: string, m?: unknown): void },
+    roster: RosterPayload,
+  ): void {
     this.root.replaceChildren();
-    const s = state();
-    const card = this.card(`準備室 · 房號 ${s.roomCode ?? '----'}`);
+    const card = this.card(`準備室 · 房號 ${roster.roomCode || '----'}`);
 
     const list = el('div', {}, { margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '6px' });
-    s.players.forEach((p) => {
+    for (const p of roster.players) {
       const row = el('div', {}, { display: 'flex', alignItems: 'center', gap: '8px' });
       row.append(
-        el('span', {}, { width: '14px', height: '14px', borderRadius: '50%', background: p.hatColor ?? '#888' }),
-        el('span', { textContent: `${p.nickname ?? '水獺'}${p.owner ? ' 👑' : ''}${p.spectator ? ' (觀戰)' : ''}` }, { flex: '1' }),
+        el('span', {}, { width: '14px', height: '14px', borderRadius: '50%', background: p.hatColor || '#888', opacity: p.connected ? '1' : '0.4' }),
+        el('span', { textContent: `${p.nickname || '水獺'}${p.owner ? ' 👑' : ''}${p.spectator ? ' (觀戰)' : ''}` }, { flex: '1' }),
         el('span', { textContent: p.spectator ? '' : p.ready ? '✅' : '…' }),
       );
       list.append(row);
-    });
+    }
     card.append(list);
 
     const share = el('input', {
-      value: `${location.origin}${location.pathname}${joinLink(s.roomCode ?? '')}`, readOnly: true,
+      value: `${location.origin}${location.pathname}${joinLink(roster.roomCode)}`, readOnly: true,
     }, { width: '100%', padding: '6px', borderRadius: '6px', border: 'none', fontSize: '12px' });
     card.append(this.field('分享連結', share));
 
-    const mine = state().players.get(room.sessionId);
+    const mine = roster.players.find((p) => p.sessionId === room.sessionId);
     if (mine && !mine.spectator) {
       card.append(this.button(mine.ready ? '取消準備' : '準備', () => room.send(ClientMessage.SetReady, { ready: !mine.ready })));
       if (mine.owner) card.append(this.button('開始遊戲', () => room.send(ClientMessage.StartGame)));
