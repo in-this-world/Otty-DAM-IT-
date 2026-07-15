@@ -1,16 +1,12 @@
 /**
  * DamRoom — thin Colyseus glue over the pure RoomSimulation (P3-01).
  *
- * Colyseus owns transport + the reconnection primitive; RoomSimulation owns
- * all game logic. The room:
- *   - creates a sim (deterministic seed -> room code),
- *   - mirrors the roster into the synced LobbySchema on every change,
- *   - runs a 20 Hz simulation interval once the owner starts, broadcasting a
- *     full snapshot per tick,
- *   - bridges Colyseus's allowReconnection(30 s) to sim.reconnect / removal.
+ * Pinned to Colyseus 0.16 (schema v3) so the server matches the colyseus.js
+ * 0.16 client — 0.17 uses schema v4 and can't handshake with the 0.16 client.
  *
- * Not exercised by Vitest (needs a live server); kept tiny so the tested sim
- * carries the logic. Type-checked by `npm run check`.
+ * Colyseus owns transport + the reconnection primitive; RoomSimulation owns
+ * all game logic. Not exercised by Vitest (needs a live server); the tested
+ * sim carries the logic. Type-checked by `npm run check`.
  */
 import { Room, ServerError } from 'colyseus';
 import type { Client } from 'colyseus';
@@ -31,7 +27,7 @@ export interface DamRoomOptions {
   readonly timerMs?: number;
 }
 
-export class DamRoom extends Room<{ state: LobbySchema }> {
+export class DamRoom extends Room<LobbySchema> {
   /** Hard clients cap; spectators are allowed on top of the 10 otters. */
   maxClients = 50;
   private sim!: RoomSimulation;
@@ -80,18 +76,17 @@ export class DamRoom extends Room<{ state: LobbySchema }> {
     this.syncRoster();
   }
 
-  override async onLeave(client: Client): Promise<void> {
+  override async onLeave(client: Client, consented?: boolean): Promise<void> {
     const wasPlaying = this.sim.phase === 'playing';
     this.sim.disconnect(client.sessionId);
     this.syncRoster();
 
-    if (wasPlaying) {
+    if (wasPlaying && !consented) {
       try {
-        // Consented leaves reject immediately; genuine drops wait the window.
         await this.allowReconnection(client, RECONNECT_SECONDS);
         this.sim.reconnect(client.sessionId);
       } catch {
-        // Window elapsed / consented; the sim removes the otter as it ticks.
+        // Reconnection window elapsed; the sim removes the otter as it ticks.
       }
       this.syncRoster();
     }
