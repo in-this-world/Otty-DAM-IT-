@@ -74,12 +74,17 @@ test('KeyG digs up dirt', async ({ page }) => {
     () => ((window as unknown as { __otty?: Otty }).__otty?.items ?? []).filter((i) => i.type === 'dirt').length,
   );
   await page.locator('canvas').click(); // focus
-  await page.keyboard.press('KeyG');
+  // Hold KeyG (not press): dig is edge-triggered, so the down->up transition
+  // must be sampled across two update() frames. On slow software-GL CI (~7fps)
+  // an instant press can fall entirely between frames; holding guarantees one
+  // frame sees it newly-down (still exactly one dig), then we release.
+  await page.keyboard.down('KeyG');
   await page.waitForFunction(
     (n) => ((window as unknown as { __otty?: Otty }).__otty?.items ?? []).filter((i) => i.type === 'dirt').length > n,
     dirtBefore,
-    { timeout: 5_000 },
+    { timeout: 15_000 },
   );
+  await page.keyboard.up('KeyG');
   const dirtAfter = await page.evaluate(
     () => ((window as unknown as { __otty?: Otty }).__otty?.items ?? []).filter((i) => i.type === 'dirt').length,
   );
