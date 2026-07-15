@@ -24,7 +24,7 @@ import {
   type GameConfig,
 } from '../core/state';
 import { defaultSystems, reduce, type System } from '../core/tick';
-import type { Command, GameState } from '../core/types';
+import type { Command, GameState, Rect } from '../core/types';
 import {
   roomCodeFromSeed,
   sanitizeProfile,
@@ -62,6 +62,8 @@ export interface RoomSimulationOptions {
   readonly timerMs?: number;
   readonly damRequiredPerPlayer?: number;
   readonly world?: { readonly width: number; readonly height: number };
+  /** Water zones (P2-03) so float/swim + fish placement match the client. */
+  readonly water?: readonly Rect[];
   readonly hazards?: GameConfig['hazards'];
   /** Injectable pipeline (tests may pass a subset). Defaults to core order. */
   readonly systems?: readonly System[];
@@ -75,6 +77,7 @@ export class RoomSimulation {
   private readonly timerMs?: number;
   private readonly damRequiredPerPlayer: number;
   private readonly world?: { readonly width: number; readonly height: number };
+  private readonly water?: readonly Rect[];
   private readonly hazards?: GameConfig['hazards'];
   private readonly systems: readonly System[];
   private readonly reconnectWindowMs: number;
@@ -92,6 +95,7 @@ export class RoomSimulation {
     this.timerMs = opts.timerMs;
     this.damRequiredPerPlayer = opts.damRequiredPerPlayer ?? DEFAULT_DAM_REQUIRED_PER_PLAYER;
     this.world = opts.world;
+    this.water = opts.water;
     this.hazards = opts.hazards;
     this.systems = opts.systems ?? defaultSystems;
     this.reconnectWindowMs = opts.reconnectWindowMs ?? RECONNECT_WINDOW_MS;
@@ -200,6 +204,7 @@ export class RoomSimulation {
       ...(this.timerMs !== undefined ? { timerMs: this.timerMs } : {}),
       damRequiredPerPlayer: this.damRequiredPerPlayer,
       ...(this.world ? { world: this.world } : {}),
+      ...(this.water ? { water: this.water } : {}),
       ...(this.hazards ? { hazards: this.hazards } : {}),
     });
     this._phase = 'playing';

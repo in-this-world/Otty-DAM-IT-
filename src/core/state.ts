@@ -67,6 +67,19 @@ export interface GameConfig {
 export const DEFAULT_TIMER_MS = 240_000;
 export const DEFAULT_DAM_REQUIRED_PER_PLAYER = 20;
 export const DEFAULT_WORLD = { width: 1280, height: 720 } as const;
+
+/**
+ * Canonical PLAY arena — the single source of truth shared by the client
+ * (camera + tile map) and the authoritative server sim. The generic
+ * DEFAULT_WORLD above stays 1280x720 for the pure-core tests/tools; the actual
+ * game is played in this 960x540 arena with one river, so the server MUST build
+ * its sim with these or otters spawn outside the client camera (BUG-06).
+ */
+export const PLAY_WORLD = { width: 960, height: 540 } as const;
+export const PLAY_WATER_RECT: Rect = { x: 0, y: 384, width: 384, height: 156 };
+export const PLAY_WATER: readonly Rect[] = [PLAY_WATER_RECT];
+/** Party round length (matches the client's single-player default). */
+export const MULTIPLAYER_TIMER_MS = 180_000;
 export const DEFAULT_OTTER_SPEED_PER_SEC = 200;
 export const MAX_PLAYERS = 10;
 

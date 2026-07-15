@@ -13,7 +13,10 @@ import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
 import { BUILD_ZONE_HALF } from '../../core/dam';
 import { planOtterCommands, recommendedAiCount } from '../../core/ai';
-import { DEFAULT_OTTER_SPEED_PER_SEC } from '../../core/state';
+import { DEFAULT_OTTER_SPEED_PER_SEC,
+  MULTIPLAYER_TIMER_MS,
+  PLAY_WORLD,
+} from '../../core/state';
 import type { GameState } from '../../core/types';
 import {
   CONE_HAT_FRAME,
@@ -41,7 +44,7 @@ import { MobileControls } from './ui/MobileControls';
 import { OTTER_TEXTURE } from './BootScene';
 
 const PLAYER_ID = 'otter-1';
-const WORLD = { width: 960, height: 540 };
+const WORLD = PLAY_WORLD;
 const OTTER_DISPLAY_HEIGHT = 96;
 const ITEM_DISPLAY_HEIGHT = 42;
 const CONE_HAT_HEIGHT = 34;
@@ -119,7 +122,7 @@ export class GameScene extends Phaser.Scene {
         world: WORLD,
         water: WATER,
         speedByOtter,
-        timerMs: params.timer ?? 180_000,
+        timerMs: params.timer ?? MULTIPLAYER_TIMER_MS,
         ...(params.required !== null ? { damRequiredPerPlayer: params.required } : {}),
         ...(params.hazards ? { hazards: { enabled: true } } : {}),
       });

@@ -11,6 +11,8 @@
  * declared in TILE_SHEETS and verified against tiles.json by a contract test.
  */
 
+import { PLAY_WATER_RECT, PLAY_WORLD } from '../core/state';
+
 export interface WorldSize {
   readonly width: number;
   readonly height: number;
@@ -80,7 +82,7 @@ export const WATER_FRAME_MS = 450;
  * and clipped to the world. Replaces the old P2-03 placeholder rect —
  * gameplay bounds and visuals now agree.
  */
-export const WATER_RECT: Rect = { x: 0, y: 384, width: 384, height: 156 };
+export const WATER_RECT: Rect = PLAY_WATER_RECT;
 
 /** Dam site (kept in sync with GameScene.createDam). */
 export const DAM_SITE = { x: 480, y: 96 } as const;
@@ -106,7 +108,7 @@ function centred(col: number, row: number): { x: number; y: number } {
 }
 
 /** Build the full static background + animated water + decorations. */
-export function buildSceneLayout(world: WorldSize = { width: 960, height: 540 }): SceneLayout {
+export function buildSceneLayout(world: WorldSize = PLAY_WORLD): SceneLayout {
   const cols = Math.ceil(world.width / TILE);
   const rows = Math.ceil(world.height / TILE);
   const waterCols = WATER_RECT.width / TILE; // 4 (P2-12)

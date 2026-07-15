@@ -12,6 +12,7 @@
 import { Room, ServerError } from 'colyseus';
 import type { Client } from 'colyseus';
 import { DEFAULT_TICK_MS } from '../core/adapter';
+import { MULTIPLAYER_TIMER_MS, PLAY_WATER, PLAY_WORLD } from '../core/state';
 import {
   ClientMessage,
   RECONNECT_SECONDS,
@@ -38,8 +39,11 @@ export class DamRoom extends Room {
     const seed = (options.seed ?? Date.now()) >>> 0;
     this.sim = new RoomSimulation({
       seed,
+      // Match the client arena exactly, else otters spawn off-camera (BUG-06).
+      world: PLAY_WORLD,
+      water: PLAY_WATER,
+      timerMs: options.timerMs ?? MULTIPLAYER_TIMER_MS,
       ...(options.roomCode ? { roomCode: options.roomCode } : {}),
-      ...(options.timerMs !== undefined ? { timerMs: options.timerMs } : {}),
     });
     void this.setMetadata({ roomCode: this.sim.roomCode });
 
