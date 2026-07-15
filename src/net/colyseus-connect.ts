@@ -7,7 +7,7 @@
  * Room-code join relies on the server defining `filterBy(['roomCode'])`.
  */
 import { Client, type Room } from 'colyseus.js';
-import { type PlayerProfile } from './protocol';
+import { randomRoomCode, type PlayerProfile } from './protocol';
 import type { MessageHandler, NetTransport } from './transport';
 
 export interface ConnectOptions {
@@ -19,15 +19,24 @@ export interface ConnectOptions {
   readonly profile?: Partial<PlayerProfile>;
 }
 
-/** Join (or create) the Colyseus `dam` room and return the live Room. */
+/**
+ * Join or create the Colyseus `dam` room and return the live Room.
+ *
+ * The room code is CLIENT-owned so `filterBy(['roomCode'])` can pair a joiner
+ * with the host's room:
+ *   - Host (no code): `create` a fresh room with a client-generated code —
+ *     always a new instance, and matchable because the code is a create option.
+ *   - Joiner (code given): `join` the EXISTING room with that code; a bad code
+ *     throws (no match) and surfaces as 找不到房間 rather than silently opening
+ *     a second empty room.
+ */
 export async function joinRoom(opts: ConnectOptions): Promise<Room> {
   const client = new Client(opts.url);
   const roomName = opts.roomName ?? 'dam';
-  const joinOptions = {
-    profile: opts.profile,
-    ...(opts.roomCode ? { roomCode: opts.roomCode } : {}),
-  };
-  return client.joinOrCreate(roomName, joinOptions);
+  if (opts.roomCode) {
+    return client.join(roomName, { profile: opts.profile, roomCode: opts.roomCode });
+  }
+  return client.create(roomName, { profile: opts.profile, roomCode: randomRoomCode() });
 }
 
 /** Wrap a joined room in the adapter's NetTransport. */

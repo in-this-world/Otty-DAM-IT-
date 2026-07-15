@@ -33,6 +33,20 @@ export function roomCodeFromSeed(seed: number): string {
   return code;
 }
 
+/**
+ * A fresh random room code, owned by the CLIENT. The host passes this as the
+ * `roomCode` create option so Colyseus `filterBy(['roomCode'])` has a value a
+ * joiner (who passes the same code) can match — otherwise a server-invented
+ * code is never reachable and every join spins up a separate empty room.
+ */
+export function randomRoomCode(rand: () => number = Math.random): string {
+  let code = '';
+  for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
+    code += ROOM_CODE_ALPHABET[Math.floor(rand() * ROOM_CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
 /** Normalize user input (`" r/abcd "`, `"abcd"`) to a bare uppercase code. */
 export function normalizeRoomCode(raw: string): string {
   const m = raw.trim().toUpperCase().match(/[A-Z]{1,}$/);
