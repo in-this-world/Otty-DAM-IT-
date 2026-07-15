@@ -8,10 +8,12 @@ import { Server } from 'colyseus';
 import { DamRoom } from './DamRoom';
 
 const port = Number(process.env.PORT ?? 2567);
+// Bind 0.0.0.0 so Render/containers can route to it (localhost-only = 502).
+const host = process.env.HOST ?? '0.0.0.0';
 
 const gameServer = new Server();
 gameServer.define('dam', DamRoom).filterBy(['roomCode']);
 
-void gameServer.listen(port).then(() => {
-  console.log(`[otty] Colyseus server listening on :${port}`);
+void gameServer.listen(port, host).then(() => {
+  console.log(`[otty] Colyseus server listening on ${host}:${port}`);
 });
