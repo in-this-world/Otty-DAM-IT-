@@ -175,6 +175,8 @@ export const ClientMessage = {
   Draw: 'draw',
   /** P4-7: clear only the sender's own strokes on everyone's canvas. */
   ClearDrawing: 'clearDrawing',
+  /** P4-4: owner-only, once the round has ended -> back to the 準備室 lobby. */
+  Restart: 'restart',
 } as const;
 
 /** Server -> client message names. */

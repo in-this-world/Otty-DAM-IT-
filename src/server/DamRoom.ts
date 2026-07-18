@@ -81,6 +81,10 @@ export class DamRoom extends Room {
     this.onMessage(ClientMessage.ClearDrawing, (client) => {
       this.broadcast(ServerMessage.ClearDrawing, { sessionId: client.sessionId });
     });
+    // P4-4: owner-only, once the round has ended -> back to the 準備室 lobby.
+    this.onMessage(ClientMessage.Restart, (client) => {
+      if (this.sim.restart(client.sessionId)) this.broadcastRoster();
+    });
   }
 
   override onJoin(client: Client, options: { profile?: Partial<PlayerProfile> } = {}): void {

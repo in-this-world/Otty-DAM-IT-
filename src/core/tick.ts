@@ -134,7 +134,7 @@ function applyCommand(state: GameState, command: Command, events: GameEvent[]): 
       return applyStop(state, otter);
     }
     case 'poke': {
-      return applyPoke(state, otter, events);
+      return applyPoke(state, otter, events, (reason) => reject(events, command, reason));
     }
     case 'swim': {
       return applySwim(state, otter);

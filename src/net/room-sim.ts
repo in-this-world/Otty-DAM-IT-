@@ -233,9 +233,31 @@ export class RoomSimulation {
       ...(this.world ? { world: this.world } : {}),
       ...(this.water ? { water: this.water } : {}),
       ...(this.hazards ? { hazards: this.hazards } : {}),
+      // P4-3: multiplayer rounds never spawn the eagle/bear hazards.
+      isMultiplayer: true,
     });
     this._phase = 'playing';
     this.queue = [];
+    return true;
+  }
+
+  /**
+   * P4-4: owner-only, once the round has ended -> back to the 準備室 lobby.
+   * No-op (returns false) unless the room is 'ended' AND `bySessionId` is
+   * the current owner. On success: phase -> 'lobby', the finished GameState
+   * is dropped, the command queue is cleared, and every roster player's
+   * `ready` flag resets to false. This is NOT a re-join: connections,
+   * profiles, colors, joinSeq, and otterId all survive untouched, so the
+   * roster looks the same (minus readiness) when the 準備室 screen reappears.
+   */
+  restart(bySessionId: string): boolean {
+    if (this._phase !== 'ended') return false;
+    if (bySessionId !== this._ownerId) return false;
+
+    this._phase = 'lobby';
+    this._state = null;
+    this.queue = [];
+    for (const p of this.players.values()) p.ready = false;
     return true;
   }
 
