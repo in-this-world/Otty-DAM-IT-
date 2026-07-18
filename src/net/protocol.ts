@@ -140,7 +140,18 @@ export type NetErrorCode =
   | 'CONNECTION_LOST'
   | 'INTERNAL';
 
-/** Human-facing (zh-TW) copy for each error code, for the connection UX. */
+/**
+ * Human-facing (zh-TW) copy for each error code, for the connection UX.
+ *
+ * P4-0 decision: NOT routed through src/i18n.ts `t()`. This module is
+ * imported by both the client and the Colyseus server (see the file header)
+ * and must stay Vitest/pure with zero client-only globals; `i18n.ts` reads
+ * localStorage/navigator (guarded, but still a client-shaped dependency) and
+ * importing it here would couple a shared protocol file to client state.
+ * If/when server-side error copy needs localization, prefer sending
+ * `NetErrorCode` to the client and letting the client map code -> `t()`
+ * string itself, rather than importing i18n into this shared module.
+ */
 export const NET_ERROR_MESSAGES: Readonly<Record<NetErrorCode, string>> = {
   ROOM_NOT_FOUND: '找不到房間,請確認房號',
   INVALID_CODE: '房號格式錯誤(需 4 個字母)',
