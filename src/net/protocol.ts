@@ -171,6 +171,10 @@ export const ClientMessage = {
   SetProfile: 'profile',
   SetReady: 'ready',
   StartGame: 'start',
+  /** P4-7: batched points for the shared 準備室 drawing canvas. */
+  Draw: 'draw',
+  /** P4-7: clear only the sender's own strokes on everyone's canvas. */
+  ClearDrawing: 'clearDrawing',
 } as const;
 
 /** Server -> client message names. */
@@ -183,6 +187,10 @@ export const ServerMessage = {
   Snapshot: 'snapshot',
   /** An error the client should surface in the connection UX. */
   Error: 'error',
+  /** P4-7: relayed stroke batch, stamped with sender + their hat colour. */
+  Draw: 'draw',
+  /** P4-7: relayed "erase this sessionId's strokes" broadcast. */
+  ClearDrawing: 'clearDrawing',
 } as const;
 
 /** Payload: client sends a bare command (no playerId; server stamps it). */
@@ -212,6 +220,12 @@ export interface RosterEntry {
   readonly connected: boolean;
   readonly spectator: boolean;
   readonly owner: boolean;
+  /**
+   * P4-7: flushed draw-batch count for this session (RoomSimulation.
+   * doodleCount). For P4-endgame's "most doodles" fallback title: read the
+   * highest `doodleCount` across the final roster snapshot.
+   */
+  readonly doodleCount: number;
 }
 
 /** Broadcast whenever the roster or phase changes (message, not schema). */
@@ -224,4 +238,32 @@ export interface RosterPayload {
 export interface ErrorPayload {
   readonly code: NetErrorCode;
   readonly message: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* Shared 準備室 drawing canvas (P4-7).                                 */
+/* Transient lobby decoration: the server relays strokes but does NOT  */
+/* persist canvas state. A late joiner sees a blank canvas — accepted  */
+/* limitation, not a bug (see Docs/P4-drawing_summary.md).             */
+
+/** Client -> server: a flushed batch of points from makeDrawBatch. */
+export interface DrawMessage {
+  readonly pts: readonly (readonly [number, number])[];
+}
+
+/**
+ * Server -> client: a relayed stroke batch. `color` is stamped server-side
+ * from the sender's profile.hatColor (never trusted from the client), and
+ * `sessionId` tells recipients whose stroke this is so "clear only your own
+ * marks" can target just that player's lines.
+ */
+export interface DrawBroadcast {
+  readonly sessionId: string;
+  readonly color: string;
+  readonly pts: readonly (readonly [number, number])[];
+}
+
+/** Server -> client: erase this sessionId's strokes locally. */
+export interface ClearDrawingBroadcast {
+  readonly sessionId: string;
 }

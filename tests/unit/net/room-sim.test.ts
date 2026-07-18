@@ -168,3 +168,37 @@ describe('RoomSimulation — disconnect / reconnect (P3-04 policy)', () => {
     expect(room.roster().map((p) => p.sessionId)).toEqual(['sB', 'sC']);
   });
 });
+
+describe('RoomSimulation — doodle count (P4-7)', () => {
+  it('starts every session at zero doodles', () => {
+    const room = newRoom();
+    room.join('sA');
+    expect(room.doodleCount('sA')).toBe(0);
+  });
+
+  it('increments per relayed draw batch, independently per session', () => {
+    const room = newRoom();
+    room.join('sA');
+    room.join('sB');
+    room.recordDrawBatch('sA');
+    room.recordDrawBatch('sA');
+    room.recordDrawBatch('sB');
+    expect(room.doodleCount('sA')).toBe(2);
+    expect(room.doodleCount('sB')).toBe(1);
+  });
+
+  it('returns 0 for an unknown/never-drawn session', () => {
+    const room = newRoom();
+    expect(room.doodleCount('ghost')).toBe(0);
+  });
+
+  it('is queryable per sessionId regardless of roster membership', () => {
+    const room = newRoom();
+    room.join('sA');
+    room.recordDrawBatch('sA');
+    room.recordDrawBatch('sA');
+    room.recordDrawBatch('sA');
+    expect(room.doodleCount('sA')).toBe(3);
+    expect(room.roster().map((p) => p.sessionId)).toEqual(['sA']);
+  });
+});
