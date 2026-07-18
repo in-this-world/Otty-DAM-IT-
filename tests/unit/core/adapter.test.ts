@@ -47,10 +47,15 @@ describe('core/adapter LocalAdapter (fake clock, no real timers)', () => {
     adapter.onEvents((e) => all.push(...e));
     adapter.start();
     const id = firstOtterId(adapter.getState());
+    // P4-1: poke without a stick rejects rather than emitting otterPoked —
+    // still a single queued command, so commandRejected should fire exactly
+    // once (the intent this test asserts: no re-application on later ticks).
     adapter.sendCommand({ type: 'poke', playerId: id });
     scheduler.advance(50);
     scheduler.advance(50);
-    expect(all.filter((e) => e.type === 'otterPoked')).toHaveLength(1);
+    expect(
+      all.filter((e) => e.type === 'commandRejected' && e.reason === 'noStick'),
+    ).toHaveLength(1);
   });
 
   it('stop() halts the loop; start() is idempotent', () => {

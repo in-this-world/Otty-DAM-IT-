@@ -362,7 +362,8 @@ describe('P2-13 eagle carry / drop / repel', () => {
   });
 
   it('a poke with no otter in reach drives off a nearby diving eagle and an approaching bear', () => {
-    let s = oneOtter({ pos: grabAt, carries: false });
+    // P4-1: poking (even at a hazard) requires a stick (branch) in hand.
+    let s = oneOtter({ pos: grabAt, carries: true });
     const eagle: EagleState = { phase: 'swoop', targetId: null, pos: { x: 320, y: 310 }, timerMs: 400 };
     const bear: BearState = {
       phase: 'approach', pos: { x: 340, y: 280 }, targetOtterId: null, targetItemId: null, timerMs: 9000,

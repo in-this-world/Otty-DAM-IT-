@@ -461,7 +461,38 @@ export class GameScene extends Phaser.Scene {
         this.transientAnims.set(ta.otterId, { animKey: ta.animKey, expiresAt: this.time.now + ta.durationMs });
       }
       for (const fx of effectsForEvent(ev, state)) this.spawnEffect(fx);
+      // P4-1: no-stick poke rejection — only toast for the LOCAL player's
+      // own command, so a shared/networked event stream doesn't pop a hint
+      // for every otter in the room.
+      if (
+        ev.type === 'commandRejected' &&
+        ev.command === 'poke' &&
+        ev.reason === 'noStick' &&
+        ev.playerId === this.localId
+      ) {
+        this.showToast(t('hint.needStick'));
+      }
     }
+  }
+
+  /** P4-1: brief on-screen toast (fades over ~1.5s) for a rejected command. */
+  private showToast(message: string): void {
+    const text = this.add
+      .text(480, 470, message, {
+        fontSize: '18px',
+        color: '#ffe066',
+        backgroundColor: '#00304aee',
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setDepth(1000);
+    this.tweens.add({
+      targets: text,
+      alpha: 0,
+      delay: 900,
+      duration: 600,
+      onComplete: () => text.destroy(),
+    });
   }
 
   /** Spawn a short-lived sprite that rises + fades, then destroys itself. */
