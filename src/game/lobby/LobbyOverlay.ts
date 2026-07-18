@@ -32,6 +32,17 @@ export interface LobbyResult {
   readonly localPlayerId: string | null;
   readonly spectator: boolean;
   readonly roomCode: string;
+  /**
+   * P4-2/P4-4: subscribe to every roster message that arrives AFTER the
+   * round started (join/leave, ready changes, and — P4-4 — the phase
+   * flipping back to 'lobby' when the owner restarts). The lobby DOM is
+   * gone by the time this fires; GameScene/main.ts use it to keep a live
+   * nickname/owner map and to detect "time to tear down and show the lobby
+   * again". Returns an unsubscribe function.
+   */
+  readonly onRoster: (cb: (payload: RosterPayload) => void) => () => void;
+  /** P4-4: send the owner-only Restart message (no-op server-side otherwise). */
+  readonly sendRestart: () => void;
 }
 
 /** Narrow room shape the ready-room screen + drawing canvas need. Both the
@@ -178,9 +189,18 @@ export class LobbyOverlay {
       const mine = (r: RosterPayload): RosterEntry | undefined =>
         r.players.find((p) => p.sessionId === room.sessionId);
       let started = false;
+      // P4-2/P4-4: post-start roster subscribers (nickname/owner map +
+      // restart-to-lobby detection). Populated via LobbyResult.onRoster.
+      const rosterSubs = new Set<(payload: RosterPayload) => void>();
 
       room.onMessage(ServerMessage.Roster, (payload: RosterPayload) => {
-        if (started) return;
+        if (started) {
+          // Round already handed off to GameScene: keep relaying roster
+          // updates to whoever subscribed (P4-2 names, P4-4 restart), but
+          // don't touch the (already-removed) lobby DOM or re-resolve.
+          for (const cb of rosterSubs) cb(payload);
+          return;
+        }
         const me = mine(payload);
         this.controller.onWelcome({
           playerId: me?.otterId ?? null,
@@ -200,6 +220,11 @@ export class LobbyOverlay {
             localPlayerId: me?.otterId ?? null,
             spectator: Boolean(me?.spectator),
             roomCode: payload.roomCode,
+            onRoster: (cb) => {
+              rosterSubs.add(cb);
+              return () => rosterSubs.delete(cb);
+            },
+            sendRestart: () => room.send(ClientMessage.Restart),
           });
         } else {
           this.renderReadyRoom(room, payload);

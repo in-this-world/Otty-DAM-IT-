@@ -186,6 +186,72 @@ describe('RoomSimulation — no hazards in multiplayer (P4-3)', () => {
   });
 });
 
+describe('RoomSimulation — restart to lobby (P4-4)', () => {
+  it('is a no-op when the room is not ended (lobby)', () => {
+    const room = newRoom();
+    room.join('sA');
+    expect(room.restart('sA')).toBe(false);
+    expect(room.phase).toBe('lobby');
+  });
+
+  it('is a no-op when the room is playing', () => {
+    const room = newRoom();
+    room.join('sA');
+    room.start();
+    expect(room.restart('sA')).toBe(false);
+    expect(room.phase).toBe('playing');
+  });
+
+  it('is a no-op for a non-owner even once the round has ended', () => {
+    const room = newRoom({ timerMs: 100, damRequiredPerPlayer: 9999 });
+    room.join('sA');
+    room.join('sB');
+    room.start();
+    // Drain the timer to 0 so the flood ends the round ('lost').
+    room.step(TICK_MS);
+    room.step(TICK_MS);
+    room.step(TICK_MS);
+    expect(room.phase).toBe('ended');
+    expect(room.restart('sB')).toBe(false); // sB is not the owner (sA is)
+    expect(room.phase).toBe('ended');
+  });
+
+  it('the owner can restart once ended: resets to lobby, clears state/queue, unreadies everyone', () => {
+    const room = newRoom({ timerMs: 100, damRequiredPerPlayer: 9999 });
+    room.join('sA');
+    room.join('sB');
+    room.setReady('sA', true);
+    room.setReady('sB', true);
+    room.start();
+    room.step(TICK_MS);
+    room.step(TICK_MS);
+    room.step(TICK_MS);
+    expect(room.phase).toBe('ended');
+
+    expect(room.restart('sA')).toBe(true);
+    expect(room.phase).toBe('lobby');
+    expect(room.state).toBeNull();
+    for (const p of room.roster()) expect(p.ready).toBe(false);
+    // Restart is not a re-join: connections/profiles/otterId/joinSeq/owner survive.
+    expect(room.roster().map((p) => p.sessionId)).toEqual(['sA', 'sB']);
+    expect(room.ownerId).toBe('sA');
+  });
+
+  it('after a restart, the room can be started again fresh', () => {
+    const room = newRoom({ timerMs: 100, damRequiredPerPlayer: 9999 });
+    room.join('sA');
+    room.join('sB');
+    room.start();
+    room.step(TICK_MS);
+    room.step(TICK_MS);
+    room.step(TICK_MS);
+    room.restart('sA');
+    expect(room.start('sA')).toBe(true);
+    expect(room.phase).toBe('playing');
+    expect(Object.keys(room.state!.otters)).toHaveLength(2);
+  });
+});
+
 describe('RoomSimulation — doodle count (P4-7)', () => {
   it('starts every session at zero doodles', () => {
     const room = newRoom();
