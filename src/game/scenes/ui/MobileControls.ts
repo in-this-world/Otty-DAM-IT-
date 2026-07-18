@@ -10,6 +10,7 @@
 import Phaser from 'phaser';
 import type { InputSnapshot } from '../../input';
 import { clampKnob, joystickDirections } from '../../touch';
+import { t } from '../../../i18n';
 
 type ButtonKey = 'interact' | 'build' | 'poke' | 'swim' | 'throw' | 'dig' | 'eat';
 
@@ -23,15 +24,15 @@ interface ActionButton {
 
 const JOY_BASE = { x: 120, y: 430, radius: 66 } as const;
 
-const BUTTONS: readonly { key: ButtonKey; x: number; y: number; r: number; label: string; color: number }[] = [
-  { key: 'interact', x: 858, y: 452, r: 42, label: '撿/放', color: 0x3a7d44 },
-  { key: 'build', x: 852, y: 356, r: 34, label: '建', color: 0x8b5a2b },
-  { key: 'poke', x: 770, y: 420, r: 34, label: '戳', color: 0xb5462f },
-  { key: 'swim', x: 782, y: 326, r: 30, label: '游', color: 0x2f6f9f },
+const BUTTONS: readonly { key: ButtonKey; x: number; y: number; r: number; labelKey: string; color: number }[] = [
+  { key: 'interact', x: 858, y: 452, r: 42, labelKey: 'controls.interact', color: 0x3a7d44 },
+  { key: 'build', x: 852, y: 356, r: 34, labelKey: 'controls.build', color: 0x8b5a2b },
+  { key: 'poke', x: 770, y: 420, r: 34, labelKey: 'controls.poke', color: 0xb5462f },
+  { key: 'swim', x: 782, y: 326, r: 30, labelKey: 'controls.swim', color: 0x2f6f9f },
   // P2-10: throw / dig / eat
-  { key: 'throw', x: 706, y: 476, r: 30, label: '丟', color: 0xa2762d },
-  { key: 'dig', x: 700, y: 380, r: 30, label: '挖', color: 0x6b4a2b },
-  { key: 'eat', x: 912, y: 356, r: 28, label: '吃', color: 0x4f8a5b },
+  { key: 'throw', x: 706, y: 476, r: 30, labelKey: 'controls.throw', color: 0xa2762d },
+  { key: 'dig', x: 700, y: 380, r: 30, labelKey: 'controls.dig', color: 0x6b4a2b },
+  { key: 'eat', x: 912, y: 356, r: 28, labelKey: 'controls.eat', color: 0x4f8a5b },
 ];
 
 export class MobileControls {
@@ -65,7 +66,7 @@ export class MobileControls {
     for (const b of BUTTONS) {
       const circle = scene.add.circle(b.x, b.y, b.r, b.color, 0.5).setStrokeStyle(2, 0xffffff, 0.7);
       const label = scene.add
-        .text(b.x, b.y, b.label, { fontSize: '15px', color: '#ffffff' })
+        .text(b.x, b.y, t(b.labelKey), { fontSize: '15px', color: '#ffffff' })
         .setOrigin(0.5);
       this.buttons.push({ key: b.key, x: b.x, y: b.y, r: b.r, circle });
       objs.push(circle, label);

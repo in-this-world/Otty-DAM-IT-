@@ -22,6 +22,7 @@ import {
   type RosterPayload,
 } from '../../net/protocol';
 import { cycleColor, loadProfile, saveProfile } from '../../net/profile-store';
+import { getLang, setLang, t } from '../../i18n';
 
 export interface LobbyResult {
   readonly adapter: GameAdapter;
@@ -53,6 +54,9 @@ export class LobbyOverlay {
   private readonly controller = new LobbyController();
   private profile: PlayerProfile;
   private resolve!: (r: LobbyResult) => void;
+  /** Re-renders whichever screen is currently shown; refreshed by each
+   *  render* method so the language toggle can redraw in place (P4-0). */
+  private rerenderCurrent: () => void = () => this.renderSetup();
 
   constructor(private readonly opts: LobbyOptions) {
     this.profile = loadProfile(opts.storage ?? safeLocalStorage());
@@ -72,28 +76,29 @@ export class LobbyOverlay {
 
   /* --------- screen 1: personalization + create/join --------- */
   private renderSetup(): void {
+    this.rerenderCurrent = () => this.renderSetup();
     this.root.replaceChildren();
-    const card = this.card('水獺蓋水壩 · 連線大廳');
+    const card = this.card(t('lobby.title'));
 
     const nick = el('input', {
-      value: this.profile.nickname, maxLength: 12, placeholder: '暱稱',
+      value: this.profile.nickname, maxLength: 12, placeholder: t('lobby.nickname'),
     }, { padding: '8px', fontSize: '16px', borderRadius: '8px', border: 'none', width: '100%' });
     nick.oninput = () => (this.profile = saveProfile(this.storage, { ...this.profile, nickname: nick.value }));
-    card.append(this.field('暱稱', nick));
+    card.append(this.field(t('lobby.nickname'), nick));
 
-    card.append(this.colorRow('帽子顏色', 'hatColor'));
-    card.append(this.colorRow('圍巾顏色', 'scarfColor'));
+    card.append(this.colorRow(t('lobby.hatColor'), 'hatColor'));
+    card.append(this.colorRow(t('lobby.scarfColor'), 'scarfColor'));
 
     const code = el('input', {
-      value: this.opts.initialCode ?? '', placeholder: '房號 (ABCD)', maxLength: 4,
+      value: this.opts.initialCode ?? '', placeholder: t('lobby.roomCodePlaceholder'), maxLength: 4,
     }, { padding: '8px', fontSize: '16px', borderRadius: '8px', border: 'none', width: '100%', textTransform: 'uppercase' });
-    card.append(this.field('加入房號', code));
+    card.append(this.field(t('lobby.joinCodeLabel'), code));
 
     const banner = el('div', {}, { minHeight: '20px', fontSize: '14px', color: '#f88' });
-    const create = this.button('建立房間', () => void this.connect(null, banner));
-    const join = this.button('加入房間', () => {
+    const create = this.button(t('lobby.create'), () => void this.connect(null, banner));
+    const join = this.button(t('lobby.join'), () => {
       const v = this.controller.validateJoin(code.value);
-      if (!v.ok) { banner.textContent = '房號格式錯誤 (需 4 個字母)'; return; }
+      if (!v.ok) { banner.textContent = t('lobby.invalidCode'); return; }
       void this.connect(v.code!, banner);
     });
     const btns = el('div', {}, { display: 'flex', gap: '8px', marginTop: '12px' });
@@ -120,7 +125,7 @@ export class LobbyOverlay {
   private async connect(roomCode: string | null, banner: HTMLElement): Promise<void> {
     if (!this.controller.beginConnect(roomCode)) return;
     banner.style.color = '#8cf';
-    banner.textContent = '連線中…';
+    banner.textContent = t('lobby.connecting');
     try {
       const room = await joinRoom({ url: this.opts.serverUrl, roomCode: roomCode ?? undefined, profile: this.profile });
       const mine = (r: RosterPayload): RosterEntry | undefined =>
@@ -156,7 +161,7 @@ export class LobbyOverlay {
     } catch {
       this.controller.onError('ROOM_NOT_FOUND');
       banner.style.color = '#f88';
-      banner.textContent = '無法連線到伺服器,請稍後再試';
+      banner.textContent = t('lobby.connectFailed');
     }
   }
 
@@ -164,15 +169,16 @@ export class LobbyOverlay {
     room: { sessionId: string; send(t: string, m?: unknown): void },
     roster: RosterPayload,
   ): void {
+    this.rerenderCurrent = () => this.renderReadyRoom(room, roster);
     this.root.replaceChildren();
-    const card = this.card(`準備室 · 房號 ${roster.roomCode || '----'}`);
+    const card = this.card(t('lobby.roomTitle', { code: roster.roomCode || '----' }));
 
     const list = el('div', {}, { margin: '12px 0', display: 'flex', flexDirection: 'column', gap: '6px' });
     for (const p of roster.players) {
       const row = el('div', {}, { display: 'flex', alignItems: 'center', gap: '8px' });
       row.append(
         el('span', {}, { width: '14px', height: '14px', borderRadius: '50%', background: p.hatColor || '#888', opacity: p.connected ? '1' : '0.4' }),
-        el('span', { textContent: `${p.nickname || '水獺'}${p.owner ? ' 👑' : ''}${p.spectator ? ' (觀戰)' : ''}` }, { flex: '1' }),
+        el('span', { textContent: `${p.nickname || '水獺'}${p.owner ? t('lobby.ownerBadge') : ''}${p.spectator ? t('lobby.spectatorBadge') : ''}` }, { flex: '1' }),
         el('span', { textContent: p.spectator ? '' : p.ready ? '✅' : '…' }),
       );
       list.append(row);
@@ -182,14 +188,14 @@ export class LobbyOverlay {
     const share = el('input', {
       value: `${location.origin}${location.pathname}${joinLink(roster.roomCode)}`, readOnly: true,
     }, { width: '100%', padding: '6px', borderRadius: '6px', border: 'none', fontSize: '12px' });
-    card.append(this.field('分享連結', share));
+    card.append(this.field(t('lobby.shareLink'), share));
 
     const mine = roster.players.find((p) => p.sessionId === room.sessionId);
     if (mine && !mine.spectator) {
-      card.append(this.button(mine.ready ? '取消準備' : '準備', () => room.send(ClientMessage.SetReady, { ready: !mine.ready })));
-      if (mine.owner) card.append(this.button('開始遊戲', () => room.send(ClientMessage.StartGame)));
+      card.append(this.button(mine.ready ? t('lobby.unready') : t('lobby.ready'), () => room.send(ClientMessage.SetReady, { ready: !mine.ready })));
+      if (mine.owner) card.append(this.button(t('lobby.start'), () => room.send(ClientMessage.StartGame)));
     } else if (mine?.spectator) {
-      card.append(el('div', { textContent: '你將以觀戰身分加入' }, { marginTop: '8px', color: '#8cf' }));
+      card.append(el('div', { textContent: t('lobby.spectatorNotice') }, { marginTop: '8px', color: '#8cf' }));
     }
     this.root.append(card);
   }
@@ -203,8 +209,29 @@ export class LobbyOverlay {
       background: '#1b3b45', padding: '24px', borderRadius: '16px', width: '320px',
       boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
     });
-    c.append(el('h2', { textContent: title }, { margin: '0 0 12px', fontSize: '20px' }));
+    const header = el('div', {}, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', marginBottom: '12px',
+    });
+    header.append(
+      el('h2', { textContent: title }, { margin: '0', fontSize: '20px' }),
+      this.langToggleButton(),
+    );
+    c.append(header);
     return c;
+  }
+
+  /** EN/中 toggle (P4-0): flips the active language and redraws the current
+   *  screen in place. Persisted via setLang -> localStorage('otty.lang'). */
+  private langToggleButton(): HTMLButtonElement {
+    const btn = el('button', { textContent: t('lobby.langToggle') }, {
+      padding: '4px 10px', fontSize: '13px', borderRadius: '8px', border: '1px solid #fff',
+      background: 'transparent', color: '#eef', cursor: 'pointer', flexShrink: '0',
+    });
+    btn.onclick = () => {
+      setLang(getLang() === 'zh-TW' ? 'en' : 'zh-TW');
+      this.rerenderCurrent();
+    };
+    return btn;
   }
   private field(label: string, input: HTMLElement): HTMLElement {
     const wrap = el('label', {}, { display: 'block', margin: '8px 0', fontSize: '13px' });
