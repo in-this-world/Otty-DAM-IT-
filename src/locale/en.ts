@@ -37,6 +37,9 @@ const en: Record<string, string> = {
   'lobby.spectatorNotice': 'You will join as a spectator',
   'lobby.langToggle': '中',
 
+  // LobbyOverlay: ready room shared drawing canvas (P4-7).
+  'drawing.clearMine': 'Clear My Doodle',
+
   // MobileControls: on-screen action button labels.
   'controls.interact': 'Grab',
   'controls.build': 'Build',

@@ -85,6 +85,8 @@ export class RoomSimulation {
   private _phase: RoomPhase = 'lobby';
   private _state: GameState | null = null;
   private readonly players = new Map<string, RoomPlayer>();
+  /** P4-7: per-session flushed draw-batch count (see doodleCount()). */
+  private readonly doodleCounts = new Map<string, number>();
   private _ownerId: string | null = null;
   private joinCounter = 0;
   private queue: Command[] = [];
@@ -169,9 +171,34 @@ export class RoomSimulation {
     if (p) p.ready = ready;
   }
 
+  /**
+   * P4-7: record one flushed draw-batch from a session (called by DamRoom
+   * when it relays a ClientMessage.Draw). Tracked server-side so a later
+   * "most doodles" fallback title can read a single authoritative count -
+   * see doodleCount() and the `doodleCount` field on RosterEntry.
+   */
+  recordDrawBatch(sessionId: string): void {
+    this.doodleCounts.set(sessionId, (this.doodleCounts.get(sessionId) ?? 0) + 1);
+  }
+
+  /** Flushed draw-batch count for a session; 0 if never drawn/unknown. */
+  doodleCount(sessionId: string): number {
+    return this.doodleCounts.get(sessionId) ?? 0;
+  }
+
   getProfile(otterId: string): PlayerProfile | null {
     for (const p of this.players.values()) if (p.otterId === otterId) return p.profile;
     return null;
+  }
+
+  /**
+   * P4-7: look up a player's profile by session id (not otter id) so the
+   * server can stamp a Draw broadcast with the sender's own hatColor -
+   * never trust a client-supplied color, else a player could spoof another
+   * player's stroke color.
+   */
+  getProfileBySession(sessionId: string): PlayerProfile | null {
+    return this.players.get(sessionId)?.profile ?? null;
   }
 
   /** True when every non-spectator player has readied (owner may start). */

@@ -17,10 +17,13 @@ import {
   joinLink,
   PLAYER_COLORS,
   ServerMessage,
+  type ClearDrawingBroadcast,
+  type DrawBroadcast,
   type PlayerProfile,
   type RosterEntry,
   type RosterPayload,
 } from '../../net/protocol';
+import { makeDrawBatch } from '../../net/draw-batch';
 import { cycleColor, loadProfile, saveProfile } from '../../net/profile-store';
 import { getLang, setLang, t } from '../../i18n';
 
@@ -29,6 +32,20 @@ export interface LobbyResult {
   readonly localPlayerId: string | null;
   readonly spectator: boolean;
   readonly roomCode: string;
+}
+
+/** Narrow room shape the ready-room screen + drawing canvas need. Both the
+ *  real colyseus.js Room and test doubles satisfy this structurally. */
+interface RoomLike {
+  readonly sessionId: string;
+  send(type: string, message?: unknown): void;
+  onMessage(type: string, handler: (message: unknown) => void): void;
+}
+
+/** P4-7: live state for the shared 準備室 drawing canvas + its teardown. */
+interface DrawingCanvasHandle {
+  readonly wrap: HTMLElement;
+  stop(): void;
 }
 
 const el = <K extends keyof HTMLElementTagNameMap>(
@@ -41,6 +58,32 @@ const el = <K extends keyof HTMLElementTagNameMap>(
   Object.assign(node.style, style);
   return node;
 };
+
+/** P4-7: draw a full polyline (used for a full redraw after a clear). */
+function strokeLine(ctx: CanvasRenderingContext2D, color: string, pts: readonly (readonly [number, number])[]): void {
+  if (pts.length === 0) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(pts[0]![0], pts[0]![1]);
+  for (const [x, y] of pts) ctx.lineTo(x, y);
+  ctx.stroke();
+}
+
+/** P4-7: append newly-arrived points to an in-progress stroke without
+ *  redrawing the whole canvas — `from` bridges the gap from the previous
+ *  flushed batch so the line stays continuous across batch boundaries. */
+function strokeSegment(
+  ctx: CanvasRenderingContext2D,
+  color: string,
+  from: readonly [number, number] | undefined,
+  pts: readonly (readonly [number, number])[],
+): void {
+  const chain = from ? [from, ...pts] : pts;
+  strokeLine(ctx, color, chain);
+}
 
 export interface LobbyOptions {
   readonly serverUrl: string;
@@ -57,6 +100,10 @@ export class LobbyOverlay {
   /** Re-renders whichever screen is currently shown; refreshed by each
    *  render* method so the language toggle can redraw in place (P4-0). */
   private rerenderCurrent: () => void = () => this.renderSetup();
+  /** P4-7: shared 準備室 drawing canvas state, lazily created once per
+   *  connection (not re-created on every roster re-render). Torn down via
+   *  stopDrawingCanvas() when the round starts or the overlay closes. */
+  private drawing: DrawingCanvasHandle | null = null;
 
   constructor(private readonly opts: LobbyOptions) {
     this.profile = loadProfile(opts.storage ?? safeLocalStorage());
@@ -142,6 +189,7 @@ export class LobbyOverlay {
         });
         if (payload.phase === 'playing' || payload.phase === 'ended') {
           started = true;
+          this.stopDrawingCanvas();
           const adapter = new ColyseusAdapter(transportForRoom(room), {
             localPlayerId: me?.otterId ?? null,
           });
@@ -165,10 +213,7 @@ export class LobbyOverlay {
     }
   }
 
-  private renderReadyRoom(
-    room: { sessionId: string; send(t: string, m?: unknown): void },
-    roster: RosterPayload,
-  ): void {
+  private renderReadyRoom(room: RoomLike, roster: RosterPayload): void {
     this.rerenderCurrent = () => this.renderReadyRoom(room, roster);
     this.root.replaceChildren();
     const card = this.card(t('lobby.roomTitle', { code: roster.roomCode || '----' }));
@@ -197,7 +242,127 @@ export class LobbyOverlay {
     } else if (mine?.spectator) {
       card.append(el('div', { textContent: t('lobby.spectatorNotice') }, { marginTop: '8px', color: '#8cf' }));
     }
+
+    // P4-7: shared 準備室 drawing canvas — created once per connection and
+    // re-appended (not recreated) on every roster re-render so its pointer
+    // listeners, flush interval, and broadcast subscriptions stay alive.
+    if (mine) card.append(this.ensureDrawingCanvas(room, mine.hatColor || PLAYER_COLORS[0]).wrap);
+
     this.root.append(card);
+  }
+
+  /**
+   * Lazily builds the shared 準備室 drawing canvas + its makeDrawBatch
+   * pipeline (P4-7). Idempotent: subsequent calls return the existing
+   * handle instead of re-wiring pointer listeners / re-subscribing to
+   * broadcasts / starting a second flush interval (the P3 net lesson this
+   * repo is built on — batch, don't spam, and never leak intervals).
+   */
+  private ensureDrawingCanvas(room: RoomLike, hatColor: string): DrawingCanvasHandle {
+    if (this.drawing) return this.drawing;
+
+    const canvas = el('canvas', { width: 400, height: 200 }, {
+      width: '100%', height: '160px', borderRadius: '8px', background: '#0f2329',
+      touchAction: 'none', cursor: 'crosshair', display: 'block',
+    });
+    const ctx = canvas.getContext('2d')!;
+    // Per-session polylines (own + everyone else's), so "clear only my
+    // strokes" can drop just one session's entry and redraw the rest.
+    const strokesBySession = new Map<string, { color: string; pts: Array<readonly [number, number]> }>();
+
+    const redraw = (): void => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const { color, pts } of strokesBySession.values()) strokeLine(ctx, color, pts);
+    };
+    const appendStroke = (sessionId: string, color: string, pts: readonly (readonly [number, number])[]): void => {
+      const entry = strokesBySession.get(sessionId) ?? { color, pts: [] };
+      const from = entry.pts[entry.pts.length - 1];
+      entry.color = color;
+      entry.pts.push(...pts);
+      strokesBySession.set(sessionId, entry);
+      strokeSegment(ctx, color, from, pts);
+    };
+
+    const batch = makeDrawBatch({
+      color: hatColor,
+      send: (payload) => room.send(ClientMessage.Draw, { pts: payload.pts }),
+    });
+
+    let isDrawing = false;
+    const rectPoint = (ev: PointerEvent): [number, number] => {
+      const r = canvas.getBoundingClientRect();
+      const x = ((ev.clientX - r.left) / r.width) * canvas.width;
+      const y = ((ev.clientY - r.top) / r.height) * canvas.height;
+      return [x, y];
+    };
+    const addLocalPoint = (ev: PointerEvent): void => {
+      const [x, y] = rectPoint(ev);
+      batch.addPoint(x, y);
+      appendStroke(room.sessionId, hatColor, [[x | 0, y | 0]]);
+    };
+    const onDown = (ev: PointerEvent): void => { isDrawing = true; addLocalPoint(ev); };
+    const onMove = (ev: PointerEvent): void => { if (isDrawing) addLocalPoint(ev); };
+    const onUp = (): void => { isDrawing = false; };
+    canvas.addEventListener('pointerdown', onDown);
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerup', onUp);
+    canvas.addEventListener('pointerleave', onUp);
+
+    // Drive the batcher's flush timer off a plain interval (P3 net lesson:
+    // batch + flush periodically, never one network message per pointer
+    // event). Cleared in stop() so it never leaks past this screen.
+    const FLUSH_MS = 50;
+    const interval = setInterval(() => batch.tick(FLUSH_MS), FLUSH_MS);
+
+    room.onMessage(ServerMessage.Draw, (message: unknown) => {
+      const m = message as DrawBroadcast;
+      if (!m || m.sessionId === room.sessionId || !Array.isArray(m.pts)) return;
+      appendStroke(m.sessionId, m.color, m.pts);
+    });
+    room.onMessage(ServerMessage.ClearDrawing, (message: unknown) => {
+      const m = message as ClearDrawingBroadcast;
+      if (!m) return;
+      strokesBySession.delete(m.sessionId);
+      redraw();
+    });
+
+    const clearBtn = this.button(t('drawing.clearMine'), () => {
+      strokesBySession.delete(room.sessionId); // optimistic local clear
+      redraw();
+      room.send(ClientMessage.ClearDrawing);
+    });
+    clearBtn.style.marginTop = '4px';
+
+    const wrap = el('div', {}, { marginTop: '10px' });
+    wrap.append(canvas, clearBtn);
+
+    this.drawing = {
+      wrap,
+      stop: () => {
+        clearInterval(interval);
+        canvas.removeEventListener('pointerdown', onDown);
+        canvas.removeEventListener('pointermove', onMove);
+        canvas.removeEventListener('pointerup', onUp);
+        canvas.removeEventListener('pointerleave', onUp);
+      },
+    };
+    return this.drawing;
+  }
+
+  /**
+   * P4-7: fade the canvas out over ~400ms then tear it down, once the round
+   * starts (roster phase flips away from 'lobby'). No-op if never created.
+   */
+  private stopDrawingCanvas(): void {
+    if (!this.drawing) return;
+    const handle = this.drawing;
+    this.drawing = null;
+    handle.wrap.style.transition = 'opacity 400ms';
+    handle.wrap.style.opacity = '0';
+    setTimeout(() => {
+      handle.stop();
+      handle.wrap.remove();
+    }, 400);
   }
 
   /* --------- helpers --------- */
@@ -247,6 +412,7 @@ export class LobbyOverlay {
     return b;
   }
   private close(): void {
+    this.stopDrawingCanvas();
     this.root.remove();
   }
 }

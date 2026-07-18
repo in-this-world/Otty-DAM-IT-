@@ -39,6 +39,9 @@ const zhTW: Record<string, string> = {
   'lobby.spectatorNotice': '你將以觀戰身分加入',
   'lobby.langToggle': 'EN',
 
+  // LobbyOverlay: 準備室 shared drawing canvas (P4-7).
+  'drawing.clearMine': '清除我的塗鴉',
+
   // MobileControls: on-screen action button labels.
   'controls.interact': '撿/放',
   'controls.build': '建',
