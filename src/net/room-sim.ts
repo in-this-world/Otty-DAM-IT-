@@ -233,6 +233,8 @@ export class RoomSimulation {
       ...(this.world ? { world: this.world } : {}),
       ...(this.water ? { water: this.water } : {}),
       ...(this.hazards ? { hazards: this.hazards } : {}),
+      // P4-3: multiplayer rounds never spawn the eagle/bear hazards.
+      isMultiplayer: true,
     });
     this._phase = 'playing';
     this.queue = [];

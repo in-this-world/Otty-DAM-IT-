@@ -169,6 +169,23 @@ describe('RoomSimulation — disconnect / reconnect (P3-04 policy)', () => {
   });
 });
 
+describe('RoomSimulation — no hazards in multiplayer (P4-3)', () => {
+  it('start() forces an empty eagle/bear schedule even when hazards are configured', () => {
+    const room = newRoom({ hazards: { enabled: true } });
+    room.join('sA');
+    room.join('sB');
+    room.start();
+    expect(room.state!.hazards).toEqual({ eagle: null, bear: null, schedule: [] });
+  });
+
+  it('start() with no hazards config at all leaves hazards undefined (baseline unaffected)', () => {
+    const room = newRoom();
+    room.join('sA');
+    room.start();
+    expect(room.state!.hazards).toBeUndefined();
+  });
+});
+
 describe('RoomSimulation — doodle count (P4-7)', () => {
   it('starts every session at zero doodles', () => {
     const room = newRoom();

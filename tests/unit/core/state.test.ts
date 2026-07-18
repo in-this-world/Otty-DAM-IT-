@@ -90,4 +90,47 @@ describe('core/state createInitialState', () => {
     expect(s.otters['otter-2']?.speedPerSec).toBe(110);
     expect(s.otters['otter-3']?.speedPerSec).toBe(90);
   });
+
+  /* -------------------- P4-3: no bear/eagle in multiplayer -------------------- */
+
+  it('isMultiplayer: true forces an empty hazard schedule even when hazards are enabled', () => {
+    const s = createInitialState({
+      playerCount: 4,
+      seed: 42,
+      isMultiplayer: true,
+      hazards: { enabled: true },
+    });
+    expect(s.hazards).toEqual({ eagle: null, bear: null, schedule: [] });
+  });
+
+  it('isMultiplayer: true forces an empty schedule even with an explicit hazard schedule', () => {
+    const s = createInitialState({
+      playerCount: 2,
+      seed: 42,
+      isMultiplayer: true,
+      hazards: { schedule: [{ kind: 'eagle', atElapsedMs: 1000 }] },
+    });
+    expect(s.hazards).toEqual({ eagle: null, bear: null, schedule: [] });
+  });
+
+  it('isMultiplayer omitted/false + hazards enabled is unchanged from today (regression)', () => {
+    const withFlagFalse = createInitialState({
+      playerCount: 4,
+      seed: 42,
+      isMultiplayer: false,
+      hazards: { enabled: true },
+    });
+    const withoutFlag = createInitialState({
+      playerCount: 4,
+      seed: 42,
+      hazards: { enabled: true },
+    });
+    expect(withFlagFalse).toEqual(withoutFlag);
+    expect(withoutFlag.hazards!.schedule.length).toBeGreaterThan(0);
+  });
+
+  it('isMultiplayer has no effect when hazards are omitted entirely (single-player default)', () => {
+    const s = createInitialState({ playerCount: 3, seed: 42, isMultiplayer: true });
+    expect(s.hazards).toBeUndefined();
+  });
 });
