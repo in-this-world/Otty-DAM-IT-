@@ -16,6 +16,10 @@ const ITEM_FRAME: Record<ItemType, string> = {
   stone: 'obj_stone_1', // small rock (0 is a tiny pebble)
   cone: 'obj_cone_0',
   dirt: 'obj_dirt_0',
+  // P4-6/P4-5: no art yet (see art pipeline docs); placeholder frame name,
+  // deliberately excluded from render-map.test.ts's atlas contract check
+  // until the asset pipeline adds obj_mushroom_*.
+  mushroom: 'obj_mushroom_0',
 };
 
 export function itemFrame(type: ItemType): string {

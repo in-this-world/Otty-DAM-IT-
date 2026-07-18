@@ -33,7 +33,7 @@ describe('core/state createInitialState', () => {
     // default rounds scatter 2x required progress in items (P2-01 mix:
     // mostly branches, a sprinkle of fish and stones) so the round is winnable
     expect(Object.keys(s.items)).toHaveLength(Math.ceil(s.dam.required * 2));
-    const byType = { branch: 0, fish: 0, stone: 0, cone: 0, dirt: 0 };
+    const byType = { branch: 0, fish: 0, stone: 0, cone: 0, dirt: 0, mushroom: 0 };
     for (const item of Object.values(s.items)) {
       byType[item.type] += 1;
       expect(item.heldBy).toBeNull();
