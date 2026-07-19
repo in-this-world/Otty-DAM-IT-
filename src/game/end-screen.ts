@@ -1,9 +1,10 @@
 /**
- * P4-2/P4-4: end-of-round overlay row data — PURE module, zero Phaser
+ * P4-2/P4-4/P4-8: end-of-round overlay row data — PURE module, zero Phaser
  * imports (same pattern as render-map.ts). Resolves each otter's display
  * name (from PlayerProfile.nickname when known) and an idle animation key
  * to draw a small portrait, plus (P4-4) whether that player is the room
- * owner so the end screen can gate a "Restart" control to them.
+ * owner so the end screen can gate a "Restart" control to them, plus
+ * (P4-8) a resolved title string (assignTitles' output run through t()).
  *
  * Single-player has no PlayerProfile at all (LocalAdapter never builds a
  * roster) — those otters fall back to a generic label: "P1" for the local
@@ -15,6 +16,7 @@
  */
 import type { GamePhase, OtterState } from '../core/types';
 import { otterAnimKey } from './render-map';
+import { t } from '../i18n';
 
 /** The minimal per-otter identity info the end screen needs (P4-2 + P4-4). */
 export interface EndScreenProfile {
@@ -29,6 +31,13 @@ export interface EndScreenRow {
   /** Idle animation key to play on the portrait sprite (render-map). */
   readonly animKey: string;
   readonly owner: boolean;
+  /**
+   * P4-8: resolved title string (t(titleKey, { name })), e.g.
+   * "Sea Biscuit - Devourer of All Fish". Undefined when no
+   * titlesByOtterId map was passed to buildEndScreenRows (caller opted
+   * out, e.g. a screen that doesn't want titles yet).
+   */
+  readonly title?: string;
 }
 
 /** Local single-player's controlled otter id (matches GameScene.PLAYER_ID). */
@@ -55,11 +64,18 @@ function fallbackName(otterId: string): string {
  * `profilesByOtterId` is typically built from the multiplayer roster
  * (RosterEntry.nickname/.owner keyed by otterId); omit/leave sparse for
  * single-player and every otter gets the P1/AI-N fallback.
+ *
+ * `titlesByOtterId` (P4-8) is typically assignTitles' output (otterId ->
+ * title key, e.g. 'title.fish'); when given, each row's `title` is that
+ * key resolved through t() with the row's already-computed display name.
+ * Omit it (default) to leave `title` undefined — e.g. a caller that
+ * doesn't have per-round stats yet.
  */
 export function buildEndScreenRows(
   otters: Readonly<Record<string, OtterState>>,
   profilesByOtterId: Readonly<Record<string, EndScreenProfile>> = {},
   phase: GamePhase = 'won',
+  titlesByOtterId?: Readonly<Record<string, string>>,
 ): EndScreenRow[] {
   return Object.values(otters)
     .slice()
@@ -67,11 +83,13 @@ export function buildEndScreenRows(
     .map((otter) => {
       const profile = profilesByOtterId[otter.id];
       const name = profile?.nickname?.trim() ? profile.nickname : fallbackName(otter.id);
+      const titleKey = titlesByOtterId?.[otter.id];
       return {
         otterId: otter.id,
         name,
         animKey: otterAnimKey({ action: 'idle', stunnedMs: 0 }, phase),
         owner: profile?.owner ?? false,
+        ...(titleKey ? { title: t(titleKey, { name }) } : {}),
       };
     });
 }
