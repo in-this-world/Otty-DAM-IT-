@@ -139,6 +139,8 @@ export class DamRoom extends Room {
         spectator: p.spectator,
         owner: p.sessionId === this.sim.ownerId,
         doodleCount: this.sim.doodleCount(p.sessionId),
+        // P4-8: per-otter stat tally, once the round has started.
+        stats: p.otterId ? this.sim.stats()[p.otterId] : undefined,
       })),
     };
   }

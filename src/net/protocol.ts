@@ -10,6 +10,7 @@
  * GameState + the tick's events). One source of truth, no schema divergence.
  */
 import type { Command, GameEvent, GameState } from '../core/types';
+import type { PlayerStats } from '../core/stats';
 
 /** Join links look like `#/r/ABCD` — 4 unambiguous uppercase letters. */
 export const ROOM_CODE_LENGTH = 4;
@@ -228,6 +229,13 @@ export interface RosterEntry {
    * highest `doodleCount` across the final roster snapshot.
    */
   readonly doodleCount: number;
+  /**
+   * P4-8: this player's current stat tally (RoomSimulation.stats()),
+   * present once the round has started; undefined in the lobby before
+   * start(). The client merges doodleCount into a copy of this (keyed by
+   * otterId) before running assignTitles for the end screen.
+   */
+  readonly stats?: PlayerStats;
 }
 
 /** Broadcast whenever the roster or phase changes (message, not schema). */

@@ -5,6 +5,7 @@ import { BootScene } from './game/scenes/BootScene';
 import { GameScene } from './game/scenes/GameScene';
 import type { EndScreenProfile } from './game/end-screen';
 import type { RosterPayload } from './net/protocol';
+import type { PlayerStats } from './core/stats';
 
 const baseConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,6 +24,23 @@ function rosterToProfiles(payload: RosterPayload): Record<string, EndScreenProfi
   const map: Record<string, EndScreenProfile> = {};
   for (const p of payload.players) {
     if (p.otterId) map[p.otterId] = { nickname: p.nickname, owner: p.owner };
+  }
+  return map;
+}
+
+/**
+ * P4-8: build the {otterId -> PlayerStats} map GameScene's end screen reads
+ * for title assignment, merging each player's server-tallied `stats`
+ * (RoomSimulation.stats(), relayed via RosterEntry.stats) with their
+ * doodleCount (tracked separately per-session — see RoomSimulation.
+ * doodleCount). Players without an otterId (spectators) or without stats
+ * yet (round hasn't started) are skipped.
+ */
+function rosterToStats(payload: RosterPayload): Record<string, PlayerStats> {
+  const map: Record<string, PlayerStats> = {};
+  for (const p of payload.players) {
+    if (!p.otterId || !p.stats) continue;
+    map[p.otterId] = { ...p.stats, doodles: p.doodleCount };
   }
   return map;
 }
@@ -54,6 +72,7 @@ async function boot(): Promise<void> {
             g.registry.set('netAdapter', result.adapter);
             g.registry.set('netLocalId', result.localPlayerId);
             g.registry.set('netRosterMap', {} as Record<string, EndScreenProfile>);
+            g.registry.set('netStatsMap', {} as Record<string, PlayerStats>);
             g.registry.set('netIsOwner', false);
             g.registry.set('netSendRestart', result.sendRestart);
           },
@@ -62,6 +81,7 @@ async function boot(): Promise<void> {
       let wasPlaying = false;
       result.onRoster((payload) => {
         game.registry.set('netRosterMap', rosterToProfiles(payload));
+        game.registry.set('netStatsMap', rosterToStats(payload));
         const mine = result.localPlayerId ? rosterToProfiles(payload)[result.localPlayerId] : undefined;
         game.registry.set('netIsOwner', Boolean(mine?.owner));
         if (payload.phase === 'playing' || payload.phase === 'ended') wasPlaying = true;

@@ -1,9 +1,11 @@
 /**
- * P4-2/P4-4: pure end-screen row builder — name resolution + fallback.
+ * P4-2/P4-4/P4-8: pure end-screen row builder — name resolution + fallback,
+ * plus (P4-8) attaching a resolved title string per row.
  */
 import { describe, expect, it } from 'vitest';
 import { buildEndScreenRows } from '../../../src/game/end-screen';
 import { createInitialState } from '../../../src/core/state';
+import { t } from '../../../src/i18n';
 
 function otters(count: number) {
   return createInitialState({ playerCount: count, seed: 1 }).otters;
@@ -51,5 +53,30 @@ describe('buildEndScreenRows', () => {
 
   it('empty otters map produces no rows', () => {
     expect(buildEndScreenRows({})).toEqual([]);
+  });
+
+  it('attaches a resolved title string per row when a titlesByOtterId map is given', () => {
+    const rows = buildEndScreenRows(
+      otters(2),
+      {
+        'otter-1': { nickname: 'Sea Biscuit' },
+        'otter-2': { nickname: 'Kelp Boy' },
+      },
+      'won',
+      { 'otter-1': 'title.fish', 'otter-2': 'title.dam' },
+    );
+    expect(rows[0]!.title).toBe(t('title.fish', { name: 'Sea Biscuit' }));
+    expect(rows[1]!.title).toBe(t('title.dam', { name: 'Kelp Boy' }));
+  });
+
+  it('omits the title field (undefined) when no titlesByOtterId map is given', () => {
+    const rows = buildEndScreenRows(otters(1));
+    expect(rows[0]!.title).toBeUndefined();
+  });
+
+  it('falls back to an empty title when the otter is missing from titlesByOtterId', () => {
+    const rows = buildEndScreenRows(otters(2), {}, 'won', { 'otter-1': 'title.fish' });
+    expect(rows[0]!.title).toBe(t('title.fish', { name: 'P1' }));
+    expect(rows[1]!.title).toBeUndefined();
   });
 });
