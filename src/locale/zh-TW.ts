@@ -50,6 +50,15 @@ const zhTW: Record<string, string> = {
   'controls.throw': '丟',
   'controls.dig': '挖',
   'controls.eat': '吃',
+
+  // End screen: per-player titles (P4-8).
+  'title.fish': '{name} - 全魚吞噬者',
+  'title.dam': '{name} - 「壩」命建築大師',
+  'title.poop': '{name} - 認證挖屎官',
+  'title.mush': '{name} - 至尊蘑菇王',
+  'title.swim': '{name} - 兼職游泳選手',
+  'title.nobita': '{name} - 大雄的夢中情人',
+  'title.eagle': '{name} - 老鷹的秘密戀人',
 };
 
 export default zhTW;

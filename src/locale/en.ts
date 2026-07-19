@@ -48,6 +48,15 @@ const en: Record<string, string> = {
   'controls.throw': 'Throw',
   'controls.dig': 'Dig',
   'controls.eat': 'Eat',
+
+  // End screen: per-player titles (P4-8).
+  'title.fish': '{name} - Devourer of All Fish',
+  'title.dam': '{name} - DAM Hard Builder',
+  'title.poop': '{name} - Certified Poop Digger',
+  'title.mush': '{name} - Supreme Mushroom King',
+  'title.swim': '{name} - Part-Time Swimmer',
+  'title.nobita': "{name} - Nobita's Dream Girl",
+  'title.eagle': "{name} - The Eagle's Secret Lover",
 };
 
 export default en;
