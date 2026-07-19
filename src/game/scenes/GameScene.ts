@@ -44,6 +44,7 @@ import { MobileControls } from './ui/MobileControls';
 import { OTTER_TEXTURE } from './BootScene';
 import { t } from '../../i18n';
 import { buildEndScreenRows, type EndScreenProfile } from '../end-screen';
+import { assignTitles, initStats, type PlayerStats } from '../../core/stats';
 
 const PLAYER_ID = 'otter-1';
 const WORLD = PLAY_WORLD;
@@ -386,6 +387,25 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** P4-8: {otterId -> title key} for the current round, using LocalAdapter's
+   *  own tally in single-player or the roster-relayed stats map in
+   *  multiplayer (see main.ts rosterToStats / GameAdapter.getStats). */
+  private computeTitles(state: GameState): Record<string, string> {
+    const netStats = this.game.registry.get('netStatsMap') as
+      | Record<string, PlayerStats>
+      | undefined;
+    const localAdapter = this.adapter as { getStats?: () => Record<string, PlayerStats> };
+    const statsById =
+      netStats ??
+      (typeof localAdapter.getStats === 'function' ? localAdapter.getStats() : undefined) ??
+      {};
+    const players = Object.keys(state.otters).map((id) => ({
+      id,
+      stats: statsById[id] ?? initStats(),
+    }));
+    return assignTitles(players);
+  }
+
   private renderOverlay(state: GameState): void {
     if (state.phase === 'playing' || this.overlay) return;
     const won = state.phase === 'won';
@@ -396,8 +416,12 @@ export class GameScene extends Phaser.Scene {
     const profiles = (this.game.registry.get('netRosterMap') as
       | Record<string, EndScreenProfile>
       | undefined) ?? {};
-    const rows = buildEndScreenRows(state.otters, profiles, state.phase);
-    const boxHeight = 200 + (rows.length > 0 ? 70 : 0);
+    // P4-8: per-player title, attached to each row by buildEndScreenRows.
+    const titles = this.computeTitles(state);
+    const rows = buildEndScreenRows(state.otters, profiles, state.phase, titles);
+    // P4-8: rows with a title get extra box height for the title line.
+    const hasTitles = rows.some((r) => r.title);
+    const boxHeight = 200 + (rows.length > 0 ? 70 : 0) + (hasTitles ? 22 : 0);
     const boxY = 270 - (boxHeight - 200) / 2;
     const box = this.add
       .rectangle(480, boxY, 560, boxHeight, 0x00304a, 0.92)
@@ -427,13 +451,25 @@ export class GameScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 0);
         children.push(portrait, label);
+        // P4-8: small title line under the name, e.g. "P1 - Devourer of All Fish".
+        if (row.title) {
+          const titleLabel = this.add
+            .text(x, rowY + 50, row.title, {
+              fontSize: '9px',
+              color: '#ffe08a',
+              align: 'center',
+              wordWrap: { width: spacing + 20 },
+            })
+            .setOrigin(0.5, 0);
+          children.push(titleLabel);
+        }
       });
     }
 
     // P4-4: multiplayer shows a host-only Restart control back to the same
     // 準備室 lobby; single-player keeps the R-key/click local restart exactly
     // as before. Non-owner multiplayer clients get only the hint text.
-    const hintY = boxY + (rows.length > 0 ? 82 : 30);
+    const hintY = boxY + (rows.length > 0 ? 82 + (hasTitles ? 22 : 0) : 30);
     if (this.networked) {
       if (this.netIsOwner()) {
         const restartBtn = this.add
