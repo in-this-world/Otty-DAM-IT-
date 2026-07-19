@@ -59,16 +59,22 @@
 | P3-04 | C | Tester | 多人測試:2 人合作勝利、10 人房、斷線重連 | P3-03 | 全綠 | done* | Claude 2026-07-13(in-process 多人整合 3 測全綠;301 unit+build 綠。*真 host 雙瀏覽器待) |
 | P3-05 | B | Developer | 準備室 personalization:暱稱(localStorage)+帽/圍巾顏色+頭頂名牌、免登入 | P3-02 | 暱稱/顏色持久化、名牌顯示 | done | Claude 2026-07-13(protocol PlayerProfile+profile-store+接進準備室;5 測) |
 
-## P4 打磨 / P5 上線(摘要,屆時由 PM 展開細項)
+## P4 打磨(已完成,細項見下)/ P5 上線(摘要,屆時由 PM 展開細項)
 
-| ID | 泳道 | 角色 | 任務 | 依賴 |
-|---|---|---|---|---|
-| P4-01 | D+B | Designer+Dev | 正式資產全面替換 placeholder、UI 皮膚、視覺回歸基準更新 | P2-09,P3-03 |
-| P4-02 | B | Developer | 音效/BGM、結算獎項(MVP/最混/吃最多魚) | P3-03 |
-| P4-03 | C | Tester | 跨裝置矩陣(桌機/平板/5 年舊手機模擬)、首載 < 3MB 驗證 | P4-01 |
-| P5-01 | F | Maintainer | CF Pages + Fly.io 部署、PWA manifest、生產冒煙 E2E | P4-03 |
-| P5-02 | G | Marketing | itch.io 正式頁、CrazyGames/Poki 提交、發布素材 | P5-01 |
-| P5-03 | C+All | Tester | 10 人真人壓測趴 + 修修補補 | P5-01 |
+| ID | 泳道 | 角色 | 任務 | 依賴 | 驗收條件 | 狀態 | Owner |
+|---|---|---|---|---|---|---|---|
+| P4-0 | F | Developer | i18n 基礎:`t()`/`setLang()`/`getLang()` + zh-TW/en 雙語辭典,既有 UI 字串全轉 key | P3 全 | unit:語言切換/插值;既有測試不回歸 | done | Claude(feat/P4-i18n;見 Docs/P4-0_summary.md) |
+| P4-1 | A | Developer | 戳人 F 改為需持木棍(branch)才可觸發,空手戳出 `hint.needStick` 提示 | P4-0 | unit:空手戳被拒+提示、持棍戳成功 | done | Claude(feat/P4-core;見 Docs/P4-core_summary.md) |
+| P4-2 | B | Developer | 結算畫面顯示玩家暱稱(取代 otterId),純模組 `end-screen.ts` 逐列產生頭像+名字 | P4-0,P3-05 | unit:單機 P1/AI-N fallback、多人暱稱正確解析 | done | Claude(feat/P4-core) |
+| P4-3 | A | Developer | 多人房不生成老鷹/熊突發事件(單機保留) | P4-0 | unit:`RoomSimulation.start` 帶 `isMultiplayer` 不排突發事件排程 | done | Claude(feat/P4-core) |
+| P4-4 | E | Developer | 房主專屬「重新開始」回準備室(結算畫面),非房主僅顯示提示 | P4-2 | unit:`RoomSimulation.restart` 房主門檻+重置名冊 ready | done | Claude(feat/P4-core) |
+| P4-5 | A | Developer | 蘑菇道具:吃了疊層放大(最多 4 層,`MUSHROOM_SCALE`),`OtterState.mushroomStacks?/scale?` | P4-0 | unit:疊層封頂、`scale` 計算正確 | done | Claude(feat/P4-loot;見 Docs/P4-loot_summary.md) |
+| P4-6 | A | Developer | 挖土改權重 loot table(大便/蘑菇/鑽石/背心/稀有帽/落空),`lootRolled` 事件 | P4-5 | unit:權重和=100、`rollLoot` 邊界值全覆蓋 | done | Claude(feat/P4-loot) |
+| P4-7 | E+B | Developer | 準備室共享塗鴉板:批次傳輸筆劃、個人專屬清除,不落地持久化 | P4-0 | unit:draw-batch 批次化;E2E:多端塗鴉互見 | done | Claude(feat/P4-drawing;見 Docs/P4-drawing_summary.md) |
+| P4-8 | A+B | Developer | 統計、稱號與結算畫面:`stats.ts`(逐 tick 統計:吃魚/建壩/挖到大便&鑽石/吃蘑菇/游泳時間/塗鴉數)+ `assignTitles`(優先序+防重複稱號池)+ 結算畫面每列附稱號 | P4-2,P4-6,P4-7 | unit:各統計正確累計、稱號分配符合優先序與防重複(7 人測試)、零統計玩家仍有 fallback 稱號 | done | Claude(feat/P4-endgame;見 Docs/P4-endgame_summary.md;357→383 測) |
+| P5-01 | F | Maintainer | CF Pages + Fly.io 部署、PWA manifest、生產冒煙 E2E | P4-8 |  |  |  |
+| P5-02 | G | Marketing | itch.io 正式頁、CrazyGames/Poki 提交、發布素材 | P5-01 |  |  |  |
+| P5-03 | C+All | Tester | 10 人真人壓測趴 + 修修補補 | P5-01 |  |  |  |
 
 ## Bug / 待決事項
 
