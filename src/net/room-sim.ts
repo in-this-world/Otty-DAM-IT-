@@ -23,6 +23,7 @@ import {
   MAX_PLAYERS,
   type GameConfig,
 } from '../core/state';
+import { accumulateSwimTime, initStats, tallyEvent, type PlayerStats } from '../core/stats';
 import { defaultSystems, reduce, type System } from '../core/tick';
 import type { Command, GameState, Rect } from '../core/types';
 import {
@@ -87,6 +88,8 @@ export class RoomSimulation {
   private readonly players = new Map<string, RoomPlayer>();
   /** P4-7: per-session flushed draw-batch count (see doodleCount()). */
   private readonly doodleCounts = new Map<string, number>();
+  /** P4-8: per-otter stat tally, seeded fresh on start() (see stats()). */
+  private _stats: Record<string, PlayerStats> = {};
   private _ownerId: string | null = null;
   private joinCounter = 0;
   private queue: Command[] = [];
@@ -238,6 +241,9 @@ export class RoomSimulation {
     });
     this._phase = 'playing';
     this.queue = [];
+    // P4-8: fresh stat tally for every otter this round.
+    this._stats = {};
+    for (const id of Object.keys(this._state.otters)) this._stats[id] = initStats();
     return true;
   }
 
@@ -257,6 +263,7 @@ export class RoomSimulation {
     this._phase = 'lobby';
     this._state = null;
     this.queue = [];
+    this._stats = {};
     for (const p of this.players.values()) p.ready = false;
     return true;
   }
@@ -357,11 +364,26 @@ export class RoomSimulation {
     this.queue = [];
     const { state, events } = reduce(this._state, commands, dtMs, this.systems);
     this._state = state;
+    // P4-8: tally per-tick events, then sample swim time off the new state.
+    let stats = this._stats;
+    for (const event of events) stats = tallyEvent(stats, event);
+    stats = accumulateSwimTime(stats, state, dtMs);
+    this._stats = stats;
     if (state.phase === 'won' || state.phase === 'lost') this._phase = 'ended';
     return { state, events };
   }
 
   snapshot(): SnapshotPayload | null {
     return this._state ? { state: this._state, events: [] } : null;
+  }
+
+  /**
+   * P4-8: current per-otter stat tally for this round (empty before
+   * start(), reset on restart()). The end screen merges doodleCount from
+   * the roster payload (RosterEntry.doodleCount, matched by otterId) since
+   * doodles are tracked per-session, not per-otter, on this class.
+   */
+  stats(): Readonly<Record<string, PlayerStats>> {
+    return this._stats;
   }
 }

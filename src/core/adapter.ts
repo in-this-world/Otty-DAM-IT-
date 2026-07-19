@@ -6,6 +6,7 @@
  * not change (MASTER_PLAN §5.2 lane E).
  */
 import { createInitialState, type GameConfig } from './state';
+import { accumulateSwimTime, initStats, tallyEvent, type PlayerStats } from './stats';
 import { defaultSystems, reduce, type System } from './tick';
 import type { Command, GameEvent, GameState } from './types';
 
@@ -86,11 +87,15 @@ export class LocalAdapter implements GameAdapter {
   private readonly scheduler: TickScheduler;
   private readonly systems: readonly System[];
   private running = false;
+  /** P4-8: per-otter stat tally for this round (single-player has no
+   *  roster, so PlayerStats.doodles stays 0 for every otter here). */
+  private stats: Record<string, PlayerStats> = {};
 
   constructor(config: GameConfig, options: LocalAdapterOptions = {}) {
     this.state = createInitialState(config);
     this.scheduler = options.scheduler ?? new IntervalScheduler(DEFAULT_TICK_MS);
     this.systems = options.systems ?? defaultSystems;
+    for (const id of Object.keys(this.state.otters)) this.stats[id] = initStats();
   }
 
   sendCommand(command: Command): void {
@@ -115,6 +120,11 @@ export class LocalAdapter implements GameAdapter {
     return this.state;
   }
 
+  /** P4-8: current per-otter stat tally for this round. */
+  getStats(): Readonly<Record<string, PlayerStats>> {
+    return this.stats;
+  }
+
   start(): void {
     if (this.running) return;
     this.running = true;
@@ -132,6 +142,11 @@ export class LocalAdapter implements GameAdapter {
     this.queue = [];
     const { state, events } = reduce(this.state, commands, dtMs, this.systems);
     this.state = state;
+    // P4-8: tally per-tick events, then sample swim time off the new state.
+    let stats = this.stats;
+    for (const event of events) stats = tallyEvent(stats, event);
+    stats = accumulateSwimTime(stats, state, dtMs);
+    this.stats = stats;
     for (const callback of this.stateSubscribers) callback(state);
     if (events.length > 0) {
       for (const callback of this.eventSubscribers) callback(events);
