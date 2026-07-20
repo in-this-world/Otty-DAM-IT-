@@ -8,11 +8,6 @@
  * off (no drop, no refresh). A whiff (no otter in reach) still plays the
  * attacker's poke animation and emits otterPoked with targetId=null.
  *
- * P4-1: pokes require a stick (a carried 'branch' item) in hand. Without one
- * the command is a complete no-op — no target search, no otterPoked event,
- * no attacker pose change — and the caller (tick.ts) is expected to surface
- * a rejection via the injected `reject` callback (reason 'noStick').
- *
  * Command side only; the invuln timer decays passively in effects.ts.
  */
 import { TRANSIENT_ACTION_HOLD_MS } from './action';
@@ -35,9 +30,6 @@ const DIR_VECTORS = {
   right: { x: 1, y: 0 },
 } as const;
 
-type Reject = (reason: string) => void;
-const noopReject: Reject = () => {};
-
 function heldItemOf(
   items: Record<string, ItemState>,
   otterId: string,
@@ -45,22 +37,8 @@ function heldItemOf(
   return Object.values(items).find((i) => i.heldBy === otterId);
 }
 
-/**
- * poke command: knock the nearest otter's item loose + grant them i-frames.
- * P4-1: requires a branch ("stick") in hand — otherwise a total no-op that
- * rejects with 'noStick' (see the module doc above).
- */
-export function applyPoke(
-  state: GameState,
-  otter: OtterState,
-  events: GameEvent[],
-  reject: Reject = noopReject,
-): GameState {
-  if (otter.carrying !== 'branch') {
-    reject('noStick');
-    return state;
-  }
-
+/** poke command: knock the nearest otter's item loose + grant them i-frames. */
+export function applyPoke(state: GameState, otter: OtterState, events: GameEvent[]): GameState {
   let target: OtterState | null = null;
   let bestDist = Infinity;
   for (const o of Object.values(state.otters)) {

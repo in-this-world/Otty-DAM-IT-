@@ -42,9 +42,6 @@ import { publishSnapshot } from '../snapshot';
 import { formatTime, progressRatio } from './ui/format';
 import { MobileControls } from './ui/MobileControls';
 import { OTTER_TEXTURE } from './BootScene';
-import { t } from '../../i18n';
-import { buildEndScreenRows, type EndScreenProfile } from '../end-screen';
-import { assignTitles, initStats, type PlayerStats } from '../../core/stats';
 
 const PLAYER_ID = 'otter-1';
 const WORLD = PLAY_WORLD;
@@ -150,7 +147,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown', (e: KeyboardEvent) => {
       this.codesDown.add(e.code);
       if (e.code === 'KeyR' && this.latest && this.latest.phase !== 'playing') {
-        this.onOverlayActivate();
+        this.restart();
       }
     });
     this.input.keyboard?.on('keyup', (e: KeyboardEvent) => this.codesDown.delete(e.code));
@@ -371,7 +368,7 @@ export class GameScene extends Phaser.Scene {
     this.hudTimer = this.add
       .text(WORLD.width - 16, 16, '--:--', { fontSize: '24px', color: '#ffffff' })
       .setOrigin(1, 0);
-    this.add.text(16, 40, t('hud.controls'), {
+    this.add.text(16, 40, 'WASD移動 · E撿放 · B建造 · F戳 · C游泳 · T丟 · G挖 · Q吃', {
       fontSize: '13px',
       color: '#cfe8ef',
     });
@@ -387,140 +384,24 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  /** P4-8: {otterId -> title key} for the current round, using LocalAdapter's
-   *  own tally in single-player or the roster-relayed stats map in
-   *  multiplayer (see main.ts rosterToStats / GameAdapter.getStats). */
-  private computeTitles(state: GameState): Record<string, string> {
-    const netStats = this.game.registry.get('netStatsMap') as
-      | Record<string, PlayerStats>
-      | undefined;
-    const localAdapter = this.adapter as { getStats?: () => Record<string, PlayerStats> };
-    const statsById =
-      netStats ??
-      (typeof localAdapter.getStats === 'function' ? localAdapter.getStats() : undefined) ??
-      {};
-    const players = Object.keys(state.otters).map((id) => ({
-      id,
-      stats: statsById[id] ?? initStats(),
-    }));
-    return assignTitles(players);
-  }
-
   private renderOverlay(state: GameState): void {
     if (state.phase === 'playing' || this.overlay) return;
     const won = state.phase === 'won';
-    const title = won ? t('game.win') : t('game.lose');
-    // P4-2: one portrait + name per otter, using the multiplayer roster's
-    // nickname/owner map when present (single-player: everyone falls back
-    // to P1/AI-N — see src/game/end-screen.ts).
-    const profiles = (this.game.registry.get('netRosterMap') as
-      | Record<string, EndScreenProfile>
-      | undefined) ?? {};
-    // P4-8: per-player title, attached to each row by buildEndScreenRows.
-    const titles = this.computeTitles(state);
-    const rows = buildEndScreenRows(state.otters, profiles, state.phase, titles);
-    // P4-8: rows with a title get extra box height for the title line.
-    const hasTitles = rows.some((r) => r.title);
-    const boxHeight = 200 + (rows.length > 0 ? 70 : 0) + (hasTitles ? 22 : 0);
-    const boxY = 270 - (boxHeight - 200) / 2;
+    const title = won ? '水壩完工!全員獲勝 🎉' : '洪水來了……下次加油!';
     const box = this.add
-      .rectangle(480, boxY, 560, boxHeight, 0x00304a, 0.92)
+      .rectangle(480, 270, 560, 200, 0x00304a, 0.92)
       .setStrokeStyle(2, 0xffffff)
       .setInteractive({ useHandCursor: true });
     box.on(Phaser.Input.Events.POINTER_DOWN, () => {
-      if (this.latest && this.latest.phase !== 'playing') this.onOverlayActivate();
+      if (this.latest && this.latest.phase !== 'playing') this.restart();
     });
     const t1 = this.add
-      .text(480, boxY - 30, title, { fontSize: '30px', color: won ? '#62d96b' : '#ff8080' })
+      .text(480, 240, title, { fontSize: '30px', color: won ? '#62d96b' : '#ff8080' })
       .setOrigin(0.5);
-    const children: Phaser.GameObjects.GameObject[] = [box, t1];
-
-    if (rows.length > 0) {
-      const rowY = boxY + 8;
-      const spacing = Math.min(90, 520 / rows.length);
-      const startX = 480 - ((rows.length - 1) * spacing) / 2;
-      rows.forEach((row, i) => {
-        const x = startX + i * spacing;
-        const portrait = this.add.sprite(x, rowY, OTTER_TEXTURE);
-        if (this.anims.exists(row.animKey)) portrait.play(row.animKey);
-        if (portrait.height > 0) portrait.setScale(48 / portrait.height);
-        const label = this.add
-          .text(x, rowY + 34, `${row.name}${row.owner ? ' \u{1F451}' : ''}`, {
-            fontSize: '12px',
-            color: '#eef',
-          })
-          .setOrigin(0.5, 0);
-        children.push(portrait, label);
-        // P4-8: small title line under the name, e.g. "P1 - Devourer of All Fish".
-        if (row.title) {
-          const titleLabel = this.add
-            .text(x, rowY + 50, row.title, {
-              fontSize: '9px',
-              color: '#ffe08a',
-              align: 'center',
-              wordWrap: { width: spacing + 20 },
-            })
-            .setOrigin(0.5, 0);
-          children.push(titleLabel);
-        }
-      });
-    }
-
-    // P4-4: multiplayer shows a host-only Restart control back to the same
-    // 準備室 lobby; single-player keeps the R-key/click local restart exactly
-    // as before. Non-owner multiplayer clients get only the hint text.
-    const hintY = boxY + (rows.length > 0 ? 82 + (hasTitles ? 22 : 0) : 30);
-    if (this.networked) {
-      if (this.netIsOwner()) {
-        const restartBtn = this.add
-          .text(480, hintY, t('ui.restart'), {
-            fontSize: '18px',
-            color: '#ffffff',
-            backgroundColor: '#2f8f4a',
-            padding: { x: 14, y: 8 },
-          })
-          .setOrigin(0.5)
-          .setInteractive({ useHandCursor: true });
-        restartBtn.on(Phaser.Input.Events.POINTER_DOWN, (_p: unknown, _lx: number, _ly: number, event: { stopPropagation: () => void }) => {
-          event.stopPropagation();
-          this.onOverlayActivate();
-        });
-        children.push(restartBtn);
-      } else {
-        // Non-owner: no local restart control (R key is a no-op for them —
-        // see onOverlayActivate). They'll see the lobby automatically once
-        // the owner restarts (main.ts tears down on the roster's 'lobby'
-        // phase), so no misleading "press R" hint here.
-      }
-    } else {
-      const t2 = this.add
-        .text(480, hintY, t('game.restartHint'), { fontSize: '18px', color: '#ffffff' })
-        .setOrigin(0.5);
-      children.push(t2);
-    }
-
-    this.overlay = this.add.container(0, 0, children);
-  }
-
-  /** True when the local session owns the multiplayer room (P4-4). */
-  private netIsOwner(): boolean {
-    return Boolean(this.game.registry.get('netIsOwner'));
-  }
-
-  /** P4-4: end-screen activation (click/R-key) — network owner restarts the
-   *  whole room back to the 準備室 lobby; everyone else (single-player, or a
-   *  non-owner multiplayer client) falls back to the local scene restart. */
-  private onOverlayActivate(): void {
-    if (this.networked) {
-      if (this.netIsOwner()) {
-        const send = this.game.registry.get('netSendRestart') as (() => void) | undefined;
-        send?.();
-      }
-      // Non-owner multiplayer clients: no local restart — wait for the
-      // owner (or the roster's 'lobby' phase, handled in main.ts).
-      return;
-    }
-    this.restart();
+    const t2 = this.add
+      .text(480, 300, '按 R 再來一局', { fontSize: '18px', color: '#ffffff' })
+      .setOrigin(0.5);
+    this.overlay = this.add.container(0, 0, [box, t1, t2]);
   }
 
   /** Show mobile controls on touch devices or a narrow viewport (P2-06). */
@@ -579,38 +460,7 @@ export class GameScene extends Phaser.Scene {
         this.transientAnims.set(ta.otterId, { animKey: ta.animKey, expiresAt: this.time.now + ta.durationMs });
       }
       for (const fx of effectsForEvent(ev, state)) this.spawnEffect(fx);
-      // P4-1: no-stick poke rejection — only toast for the LOCAL player's
-      // own command, so a shared/networked event stream doesn't pop a hint
-      // for every otter in the room.
-      if (
-        ev.type === 'commandRejected' &&
-        ev.command === 'poke' &&
-        ev.reason === 'noStick' &&
-        ev.playerId === this.localId
-      ) {
-        this.showToast(t('hint.needStick'));
-      }
     }
-  }
-
-  /** P4-1: brief on-screen toast (fades over ~1.5s) for a rejected command. */
-  private showToast(message: string): void {
-    const text = this.add
-      .text(480, 470, message, {
-        fontSize: '18px',
-        color: '#ffe066',
-        backgroundColor: '#00304aee',
-        padding: { x: 12, y: 6 },
-      })
-      .setOrigin(0.5)
-      .setDepth(1000);
-    this.tweens.add({
-      targets: text,
-      alpha: 0,
-      delay: 900,
-      duration: 600,
-      onComplete: () => text.destroy(),
-    });
   }
 
   /** Spawn a short-lived sprite that rises + fades, then destroys itself. */

@@ -64,27 +64,6 @@ export class DamRoom extends Room {
     this.onMessage(ClientMessage.Command, (client, msg: ClientCommand) => {
       this.sim.enqueue(client.sessionId, msg);
     });
-    // P4-7: shared 準備室 drawing canvas. Transient decoration only — no
-    // canvas-state persistence, so a late joiner just sees a blank canvas
-    // (accepted limitation, documented in Docs/P4-drawing_summary.md).
-    this.onMessage(ClientMessage.Draw, (client, msg: { pts?: [number, number][] }) => {
-      const pts = Array.isArray(msg?.pts) ? msg.pts : [];
-      if (pts.length === 0) return;
-      const profile = this.sim.getProfileBySession(client.sessionId);
-      this.sim.recordDrawBatch(client.sessionId);
-      this.broadcast(ServerMessage.Draw, {
-        sessionId: client.sessionId,
-        color: profile?.hatColor ?? '#e6194b',
-        pts,
-      });
-    });
-    this.onMessage(ClientMessage.ClearDrawing, (client) => {
-      this.broadcast(ServerMessage.ClearDrawing, { sessionId: client.sessionId });
-    });
-    // P4-4: owner-only, once the round has ended -> back to the 準備室 lobby.
-    this.onMessage(ClientMessage.Restart, (client) => {
-      if (this.sim.restart(client.sessionId)) this.broadcastRoster();
-    });
   }
 
   override onJoin(client: Client, options: { profile?: Partial<PlayerProfile> } = {}): void {
@@ -138,9 +117,6 @@ export class DamRoom extends Room {
         connected: p.connected,
         spectator: p.spectator,
         owner: p.sessionId === this.sim.ownerId,
-        doodleCount: this.sim.doodleCount(p.sessionId),
-        // P4-8: per-otter stat tally, once the round has started.
-        stats: p.otterId ? this.sim.stats()[p.otterId] : undefined,
       })),
     };
   }

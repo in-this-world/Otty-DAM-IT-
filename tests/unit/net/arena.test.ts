@@ -37,7 +37,7 @@ describe('networked arena matches the client (BUG-06)', () => {
   it('carries the river through so fish spawn in water', () => {
     const room = playingRoom();
     const s = room.state!;
-    expect(s.water!.length).toBe(1);
+    expect(s.water.length).toBe(1);
     const r = PLAY_WATER_RECT;
     const fish = Object.values(s.items).filter((i) => i.type === 'fish');
     expect(fish.length).toBeGreaterThan(0);

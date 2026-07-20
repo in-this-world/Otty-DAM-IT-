@@ -62,14 +62,6 @@ export interface GameConfig {
     readonly count?: number;
     readonly schedule?: readonly { readonly kind: HazardKind; readonly atElapsedMs: number }[];
   };
-  /**
-   * P4-3: multiplayer rounds never spawn the eagle/bear hazards, regardless
-   * of `hazards` config — sudden-event griefing doesn't play well with a
-   * shared room of strangers/friends mid-build. Forces an empty schedule
-   * (`{ eagle: null, bear: null, schedule: [] }`) when true; single-player
-   * behavior is completely unchanged when this is false/omitted (default).
-   */
-  readonly isMultiplayer?: boolean;
 }
 
 export const DEFAULT_TIMER_MS = 240_000;
@@ -185,14 +177,8 @@ export function createInitialState(config: GameConfig): GameState {
   const timerMs = config.timerMs ?? DEFAULT_TIMER_MS;
 
   // P2-04: build the hazard schedule (deterministic from the seed).
-  // P4-3: multiplayer rounds get no eagle/bear regardless of hazards config
-  // (but only when hazards were requested at all — isMultiplayer alone,
-  // with no hazards config, still means "no hazards" == undefined, same as
-  // single-player today).
   let hazards: HazardsState | undefined;
-  if (config.hazards && config.isMultiplayer) {
-    hazards = { eagle: null, bear: null, schedule: [] };
-  } else if (config.hazards) {
+  if (config.hazards) {
     const spawns: HazardSpawn[] = [];
     if (config.hazards.schedule) {
       for (const sp of config.hazards.schedule) {

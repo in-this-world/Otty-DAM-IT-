@@ -45,21 +45,11 @@ describe('core/tick reduce', () => {
     expect(events).toContainEqual({ type: 'otterMoved', playerId: id, dir: 'up' });
   });
 
-  it('a valid poke command produces an otterPoked event (P4-1: attacker needs a stick)', () => {
-    let input = playing();
-    const id = firstOtterId(input);
-    // P4-1: pokes require a carried branch (stick) in hand.
-    input = { ...input, otters: { ...input.otters, [id]: { ...input.otters[id]!, carrying: 'branch' } } };
-    const { events } = reduce(input, [{ type: 'poke', playerId: id }], TICK_MS);
-    expect(events).toContainEqual({ type: 'otterPoked', attackerId: id, targetId: null });
-  });
-
-  it('a poke command without a stick is rejected (P4-1)', () => {
+  it('a valid poke command produces an otterPoked event', () => {
     const input = playing();
     const id = firstOtterId(input);
     const { events } = reduce(input, [{ type: 'poke', playerId: id }], TICK_MS);
-    expect(events).toContainEqual({ type: 'commandRejected', playerId: id, command: 'poke', reason: 'noStick' });
-    expect(events.some((e) => e.type === 'otterPoked')).toBe(false);
+    expect(events).toContainEqual({ type: 'otterPoked', attackerId: id, targetId: null });
   });
 
   it('rejects commands from unknown players', () => {

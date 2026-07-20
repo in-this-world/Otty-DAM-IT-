@@ -10,7 +10,6 @@
  * GameState + the tick's events). One source of truth, no schema divergence.
  */
 import type { Command, GameEvent, GameState } from '../core/types';
-import type { PlayerStats } from '../core/stats';
 
 /** Join links look like `#/r/ABCD` — 4 unambiguous uppercase letters. */
 export const ROOM_CODE_LENGTH = 4;
@@ -141,18 +140,7 @@ export type NetErrorCode =
   | 'CONNECTION_LOST'
   | 'INTERNAL';
 
-/**
- * Human-facing (zh-TW) copy for each error code, for the connection UX.
- *
- * P4-0 decision: NOT routed through src/i18n.ts `t()`. This module is
- * imported by both the client and the Colyseus server (see the file header)
- * and must stay Vitest/pure with zero client-only globals; `i18n.ts` reads
- * localStorage/navigator (guarded, but still a client-shaped dependency) and
- * importing it here would couple a shared protocol file to client state.
- * If/when server-side error copy needs localization, prefer sending
- * `NetErrorCode` to the client and letting the client map code -> `t()`
- * string itself, rather than importing i18n into this shared module.
- */
+/** Human-facing (zh-TW) copy for each error code, for the connection UX. */
 export const NET_ERROR_MESSAGES: Readonly<Record<NetErrorCode, string>> = {
   ROOM_NOT_FOUND: '找不到房間,請確認房號',
   INVALID_CODE: '房號格式錯誤(需 4 個字母)',
@@ -172,12 +160,6 @@ export const ClientMessage = {
   SetProfile: 'profile',
   SetReady: 'ready',
   StartGame: 'start',
-  /** P4-7: batched points for the shared 準備室 drawing canvas. */
-  Draw: 'draw',
-  /** P4-7: clear only the sender's own strokes on everyone's canvas. */
-  ClearDrawing: 'clearDrawing',
-  /** P4-4: owner-only, once the round has ended -> back to the 準備室 lobby. */
-  Restart: 'restart',
 } as const;
 
 /** Server -> client message names. */
@@ -190,10 +172,6 @@ export const ServerMessage = {
   Snapshot: 'snapshot',
   /** An error the client should surface in the connection UX. */
   Error: 'error',
-  /** P4-7: relayed stroke batch, stamped with sender + their hat colour. */
-  Draw: 'draw',
-  /** P4-7: relayed "erase this sessionId's strokes" broadcast. */
-  ClearDrawing: 'clearDrawing',
 } as const;
 
 /** Payload: client sends a bare command (no playerId; server stamps it). */
@@ -223,19 +201,6 @@ export interface RosterEntry {
   readonly connected: boolean;
   readonly spectator: boolean;
   readonly owner: boolean;
-  /**
-   * P4-7: flushed draw-batch count for this session (RoomSimulation.
-   * doodleCount). For P4-endgame's "most doodles" fallback title: read the
-   * highest `doodleCount` across the final roster snapshot.
-   */
-  readonly doodleCount: number;
-  /**
-   * P4-8: this player's current stat tally (RoomSimulation.stats()),
-   * present once the round has started; undefined in the lobby before
-   * start(). The client merges doodleCount into a copy of this (keyed by
-   * otterId) before running assignTitles for the end screen.
-   */
-  readonly stats?: PlayerStats;
 }
 
 /** Broadcast whenever the roster or phase changes (message, not schema). */
@@ -248,32 +213,4 @@ export interface RosterPayload {
 export interface ErrorPayload {
   readonly code: NetErrorCode;
   readonly message: string;
-}
-
-/* ------------------------------------------------------------------ */
-/* Shared 準備室 drawing canvas (P4-7).                                 */
-/* Transient lobby decoration: the server relays strokes but does NOT  */
-/* persist canvas state. A late joiner sees a blank canvas — accepted  */
-/* limitation, not a bug (see Docs/P4-drawing_summary.md).             */
-
-/** Client -> server: a flushed batch of points from makeDrawBatch. */
-export interface DrawMessage {
-  readonly pts: readonly (readonly [number, number])[];
-}
-
-/**
- * Server -> client: a relayed stroke batch. `color` is stamped server-side
- * from the sender's profile.hatColor (never trusted from the client), and
- * `sessionId` tells recipients whose stroke this is so "clear only your own
- * marks" can target just that player's lines.
- */
-export interface DrawBroadcast {
-  readonly sessionId: string;
-  readonly color: string;
-  readonly pts: readonly (readonly [number, number])[];
-}
-
-/** Server -> client: erase this sessionId's strokes locally. */
-export interface ClearDrawingBroadcast {
-  readonly sessionId: string;
 }

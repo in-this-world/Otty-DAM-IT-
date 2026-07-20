@@ -12,8 +12,6 @@ import { describe, expect, it } from 'vitest';
 import {
   FISH_BOOST_MS,
   FISH_SPEED_MULT,
-  MAX_MUSHROOM_STACKS,
-  MUSHROOM_SCALE,
   PIT_DIGGER_IMMUNE_MS,
   PIT_RADIUS,
   PIT_STUN_MS,
@@ -28,8 +26,6 @@ import type { Command, GameState, ItemType, OtterState, Vec2 } from '../../../sr
 
 const TICK_MS = 50;
 const WORLD = { width: 1000, height: 800 };
-/** A seed whose first rngStep() value (~0.0117) lands in the 'poop' loot bucket [0, 0.20). */
-const POOP_ROLL_SEED = 7;
 
 function setup(items: readonly { id: string; type: ItemType; pos: Vec2 }[]): GameState {
   return createInitialState({ playerCount: 3, seed: 1, world: WORLD, items });
@@ -350,75 +346,10 @@ describe('cone: wearable hat', () => {
 
 /* ------------------------------------------------------------------ */
 
-describe('mushroom: eat to scale up, stacks to 4 (P4-5)', () => {
-  function carryingMushroom(s: GameState, id = 'otter-1'): GameState {
-    const itemId = `m-${id}-${Math.random()}`;
-    return {
-      ...s,
-      items: { ...s.items, [itemId]: { id: itemId, type: 'mushroom', pos: otter(s, id).pos, heldBy: id } },
-      otters: { ...s.otters, [id]: { ...otter(s, id), carrying: 'mushroom' } },
-    };
-  }
-
-  it('eating one mushroom sets scale to MUSHROOM_SCALE and stacks to 1', () => {
-    let s = setup([]);
-    s = placeOtter(s, 'otter-1', 100, 100);
-    s = carryingMushroom(s);
-    const { state, events } = run(s, [{ type: 'useItem', playerId: 'otter-1' }]);
-    const o = otter(state, 'otter-1');
-    expect(o.mushroomStacks).toBe(1);
-    expect(o.scale).toBeCloseTo(MUSHROOM_SCALE);
-    expect(o.carrying).toBeNull();
-    expect(events).toContainEqual({
-      type: 'itemEaten',
-      playerId: 'otter-1',
-      itemId: expect.any(String),
-      itemType: 'mushroom',
-    });
-  });
-
-  it('stacks multiplicatively up to MAX_MUSHROOM_STACKS (4): scale == MUSHROOM_SCALE ** stacks', () => {
-    let s = setup([]);
-    s = placeOtter(s, 'otter-1', 100, 100);
-    for (let i = 0; i < MAX_MUSHROOM_STACKS; i++) {
-      s = carryingMushroom(s);
-      ({ state: s } = run(s, [{ type: 'useItem', playerId: 'otter-1' }]));
-    }
-    const o = otter(s, 'otter-1');
-    expect(o.mushroomStacks).toBe(MAX_MUSHROOM_STACKS);
-    expect(o.scale).toBeCloseTo(MUSHROOM_SCALE ** MAX_MUSHROOM_STACKS);
-  });
-
-  it('a 5th+ mushroom still emits itemEaten but scale/stacks stop changing past the cap', () => {
-    let s = setup([]);
-    s = placeOtter(s, 'otter-1', 100, 100);
-    for (let i = 0; i < MAX_MUSHROOM_STACKS; i++) {
-      s = carryingMushroom(s);
-      ({ state: s } = run(s, [{ type: 'useItem', playerId: 'otter-1' }]));
-    }
-    const capScale = otter(s, 'otter-1').scale;
-    s = carryingMushroom(s);
-    const { state, events } = run(s, [{ type: 'useItem', playerId: 'otter-1' }]);
-    const o = otter(state, 'otter-1');
-    expect(o.mushroomStacks).toBe(MAX_MUSHROOM_STACKS);
-    expect(o.scale).toBeCloseTo(capScale!);
-    expect(o.scale).toBeCloseTo(MUSHROOM_SCALE ** MAX_MUSHROOM_STACKS);
-    expect(events).toContainEqual({
-      type: 'itemEaten',
-      playerId: 'otter-1',
-      itemId: expect.any(String),
-      itemType: 'mushroom',
-    });
-  });
-});
-
-/* ------------------------------------------------------------------ */
-
 describe('dirt: dig command and pits', () => {
   it('an empty-handed otter digs up a dirt item at its feet and leaves a pit', () => {
     let s = setup([]);
     s = placeOtter(s, 'otter-1', 400, 400);
-    s = { ...s, rngSeed: POOP_ROLL_SEED }; // pin the loot roll to the 'poop' bucket
     const { state, events } = run(s, [{ type: 'dig', playerId: 'otter-1' }]);
     const dug = events.find((e) => e.type === 'dugDirt');
     expect(dug).toMatchObject({ playerId: 'otter-1', pos: { x: 400, y: 400 } });
@@ -437,7 +368,6 @@ describe('dirt: dig command and pits', () => {
     let s = setup([{ id: 'b1', type: 'branch', pos: { x: 100, y: 100 } }]);
     s = placeOtter(s, 'otter-1', 100, 100);
     ({ state: s } = run(s, [{ type: 'pickUp', playerId: 'otter-1' }]));
-    s = { ...s, rngSeed: POOP_ROLL_SEED };
     const { state, events } = run(s, [{ type: 'dig', playerId: 'otter-1' }]);
     expect(events).toContainEqual({
       type: 'commandRejected',
@@ -452,7 +382,6 @@ describe('dirt: dig command and pits', () => {
     expect(BUILD_AMOUNTS.dirt).toBe(1);
     let s = setup([]);
     s = placeOtter(s, 'otter-1', 500, 120); // within BUILD_RADIUS of the dam
-    s = { ...s, rngSeed: POOP_ROLL_SEED };
     ({ state: s } = run(s, [{ type: 'dig', playerId: 'otter-1' }]));
     ({ state: s } = run(s, [{ type: 'pickUp', playerId: 'otter-1' }]));
     expect(otter(s, 'otter-1').carrying).toBe('dirt');
@@ -464,7 +393,6 @@ describe('dirt: dig command and pits', () => {
     let s = setup([]);
     s = placeOtter(s, 'otter-1', 400, 400);
     s = placeOtter(s, 'otter-2', 400 + PIT_RADIUS - 1, 400);
-    s = { ...s, rngSeed: POOP_ROLL_SEED };
     const { state, events } = run(s, [{ type: 'dig', playerId: 'otter-1' }]);
     expect(otter(state, 'otter-2').stunnedMs).toBe(PIT_STUN_MS);
     expect(otter(state, 'otter-1').stunnedMs).toBe(0); // digger has grace
@@ -484,7 +412,6 @@ describe('dirt: dig command and pits', () => {
     s = placeOtter(s, 'otter-2', 50, 50);
     s = placeOtter(s, 'otter-3', 950, 50);
     s = placeOtter(s, 'otter-1', 400, 400);
-    s = { ...s, rngSeed: POOP_ROLL_SEED };
     ({ state: s } = run(s, [{ type: 'dig', playerId: 'otter-1' }]));
     // stand on the pit through the whole grace period
     const graceTicks = Math.ceil(PIT_DIGGER_IMMUNE_MS / TICK_MS);

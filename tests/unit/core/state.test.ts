@@ -33,7 +33,7 @@ describe('core/state createInitialState', () => {
     // default rounds scatter 2x required progress in items (P2-01 mix:
     // mostly branches, a sprinkle of fish and stones) so the round is winnable
     expect(Object.keys(s.items)).toHaveLength(Math.ceil(s.dam.required * 2));
-    const byType = { branch: 0, fish: 0, stone: 0, cone: 0, dirt: 0, mushroom: 0 };
+    const byType = { branch: 0, fish: 0, stone: 0, cone: 0, dirt: 0 };
     for (const item of Object.values(s.items)) {
       byType[item.type] += 1;
       expect(item.heldBy).toBeNull();
@@ -89,48 +89,5 @@ describe('core/state createInitialState', () => {
     expect(s.otters['otter-1']?.speedPerSec).toBe(DEFAULT_OTTER_SPEED_PER_SEC);
     expect(s.otters['otter-2']?.speedPerSec).toBe(110);
     expect(s.otters['otter-3']?.speedPerSec).toBe(90);
-  });
-
-  /* -------------------- P4-3: no bear/eagle in multiplayer -------------------- */
-
-  it('isMultiplayer: true forces an empty hazard schedule even when hazards are enabled', () => {
-    const s = createInitialState({
-      playerCount: 4,
-      seed: 42,
-      isMultiplayer: true,
-      hazards: { enabled: true },
-    });
-    expect(s.hazards).toEqual({ eagle: null, bear: null, schedule: [] });
-  });
-
-  it('isMultiplayer: true forces an empty schedule even with an explicit hazard schedule', () => {
-    const s = createInitialState({
-      playerCount: 2,
-      seed: 42,
-      isMultiplayer: true,
-      hazards: { schedule: [{ kind: 'eagle', atElapsedMs: 1000 }] },
-    });
-    expect(s.hazards).toEqual({ eagle: null, bear: null, schedule: [] });
-  });
-
-  it('isMultiplayer omitted/false + hazards enabled is unchanged from today (regression)', () => {
-    const withFlagFalse = createInitialState({
-      playerCount: 4,
-      seed: 42,
-      isMultiplayer: false,
-      hazards: { enabled: true },
-    });
-    const withoutFlag = createInitialState({
-      playerCount: 4,
-      seed: 42,
-      hazards: { enabled: true },
-    });
-    expect(withFlagFalse).toEqual(withoutFlag);
-    expect(withoutFlag.hazards!.schedule.length).toBeGreaterThan(0);
-  });
-
-  it('isMultiplayer has no effect when hazards are omitted entirely (single-player default)', () => {
-    const s = createInitialState({ playerCount: 3, seed: 42, isMultiplayer: true });
-    expect(s.hazards).toBeUndefined();
   });
 });

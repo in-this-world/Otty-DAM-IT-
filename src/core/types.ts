@@ -24,7 +24,7 @@ export interface Rect {
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
 /** Collectible/usable item kinds (P1-02 inventory, P2 item effects). */
-export type ItemType = 'branch' | 'fish' | 'stone' | 'cone' | 'dirt' | 'mushroom';
+export type ItemType = 'branch' | 'fish' | 'stone' | 'cone' | 'dirt';
 
 /** Wearable headgear (P2-01 cone; P2-04 eagle checks this for immunity). */
 export type HatType = 'cone';
@@ -68,20 +68,6 @@ export interface OtterState {
   readonly floating?: boolean;
   /** Number of OTHER otters in the same floating raft; 0/undefined when alone (P2-03). */
   readonly raftLinks?: number;
-  /** Mushrooms eaten so far, 0..MAX_MUSHROOM_STACKS (P4-5). Undefined == 0. */
-  readonly mushroomStacks?: number;
-  /**
-   * Visual/hitbox size multiplier from stacked mushrooms (P4-5). 1 == normal
-   * size; MUSHROOM_SCALE ** mushroomStacks once eating starts. Game-layer
-   * rendering/collision code should read this to scale the otter sprite and
-   * hitbox; not wired to Phaser in this slice (core state only).
-   */
-  readonly scale?: number;
-  /**
-   * Loot-table gear flags (P4-6), separate from the single cone `hat` slot
-   * above. Additive: undefined/both-false == no gear worn.
-   */
-  readonly gear?: { readonly vest?: boolean; readonly rareHat?: boolean };
 }
 
 export interface ItemState {
@@ -261,26 +247,6 @@ export type GameEvent =
   | { readonly type: 'hatWorn'; readonly playerId: string; readonly hat: HatType }
   | { readonly type: 'hatKnockedOff'; readonly playerId: string; readonly itemId: string }
   | { readonly type: 'dugDirt'; readonly playerId: string; readonly itemId: string; readonly pos: Vec2 }
-  | {
-      /**
-       * P4-6: fired for every dig, one per roll, regardless of outcome.
-       * P4-endgame stat tallying should listen to this (not dugDirt, which
-       * only fires for the 'poop' outcome) and bucket by `outcome`:
-       *   - 'poop'     -> poopsDug++ (dugDirt/pitCreated also fire, unchanged)
-       *   - 'mushroom' -> mushrooms++ (a ground mushroom item spawns; itemId set)
-       *   - 'diamond'  -> diamonds++ (instant score; scoreAwarded set, no itemId)
-       *   - 'vest'     -> gear.vest = true on the digger; scoreAwarded set
-       *   - 'hat'      -> gear.rareHat = true on the digger; scoreAwarded set
-       *   - 'nothing'  -> no state change at all
-       */
-      readonly type: 'lootRolled';
-      readonly playerId: string;
-      readonly outcome: 'poop' | 'mushroom' | 'diamond' | 'vest' | 'hat' | 'nothing';
-      /** Ground item spawned by this roll (mushroom only), else undefined. */
-      readonly itemId?: string;
-      /** Instant score granted by this roll (diamond/vest/hat), else undefined. */
-      readonly scoreAwarded?: number;
-    }
   | { readonly type: 'pitCreated'; readonly pitId: string; readonly pos: Vec2 }
   | { readonly type: 'pitFilled'; readonly pitId: string; readonly playerId: string }
   | { readonly type: 'buildAttempted'; readonly playerId: string }

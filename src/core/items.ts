@@ -11,7 +11,6 @@
  */
 import { TRANSIENT_ACTION_HOLD_MS } from './action';
 import { repelBear, repelEagle } from './hazards';
-import { rngStep } from './rng';
 import type { GameEvent, GameState, ItemState, OtterState, Vec2 } from './types';
 
 /* Tuning constants (P2-01 owns these numbers; see Docs/P2-01_summary.md). */
@@ -34,59 +33,6 @@ export const PIT_RADIUS = 32;
 export const PIT_STUN_MS = 1500;
 /** Grace period during which the digger cannot fall into their own pit, ms. */
 export const PIT_DIGGER_IMMUNE_MS = 2000;
-
-/** P4-5: per-stack scale multiplier for eating a mushroom (compounds). */
-export const MUSHROOM_SCALE = 1.5;
-/** P4-5: mushroom stacks cap; eating past this still eats but stops growing. */
-export const MAX_MUSHROOM_STACKS = 4;
-
-/* ------------------------------------------------------------------ */
-/* P4-6: dig loot table. dig used to be unconditional dirt+pit; now it   */
-/* rolls a weighted table, with that exact original effect kept as the   */
-/* 'poop' entry (thematically: sometimes you just dig up poop).          */
-
-/** Instant score granted by digging up a diamond. */
-export const DIAMOND_SCORE = 50;
-/** Small score bump for equipping the vest (on top of the cosmetic flag). */
-export const VEST_SCORE = 10;
-/** Small score bump for equipping the rare hat (on top of the cosmetic flag). */
-export const RARE_HAT_SCORE = 10;
-
-export interface LootEntry {
-  readonly id: 'poop' | 'mushroom' | 'diamond' | 'vest' | 'hat' | 'nothing';
-  readonly weight: number;
-}
-
-/**
- * Weights sum to 100 (checked by tests/loot.test.ts). Adjust these to
- * retune drop rates; rollLoot's cumulative-boundary logic doesn't care
- * about the exact numbers as long as they're non-negative.
- */
-export const LOOT_TABLE: readonly LootEntry[] = [
-  { id: 'poop', weight: 20 }, // = today's dirt+pit effect, unchanged
-  { id: 'mushroom', weight: 15 }, // spawns a ground 'mushroom' item at the dig spot
-  { id: 'diamond', weight: 5 }, // no ground item; instant +DIAMOND_SCORE to the digger
-  { id: 'vest', weight: 3 }, // digger equips a vest gear flag + small score bump
-  { id: 'hat', weight: 3 }, // digger equips a rare-hat gear flag (distinct from the cone hat slot) + small score bump
-  { id: 'nothing', weight: 54 }, // no effect at all (not even a pit)
-] as const;
-
-/**
- * Pick a LOOT_TABLE entry by cumulative-weight boundary. Pure: same
- * rngValue in [0, 1) always yields the same entry, so tests can pin exact
- * outcomes and multiplayer stays deterministic (see applyDig, which feeds
- * this the value from a single rngStep(state.rngSeed) per dig).
- */
-export function rollLoot(rngValue: number): LootEntry {
-  const total = LOOT_TABLE.reduce((sum, e) => sum + e.weight, 0);
-  const target = Math.min(rngValue, 0.9999999999) * total;
-  let cumulative = 0;
-  for (const entry of LOOT_TABLE) {
-    cumulative += entry.weight;
-    if (target < cumulative) return entry;
-  }
-  return LOOT_TABLE[LOOT_TABLE.length - 1]!;
-}
 
 /**
  * P2-03 raft speed bonus (owned by float.ts conceptually; the multiplier is
@@ -223,27 +169,6 @@ export function applyUseItem(
         },
       };
     }
-    case 'mushroom': {
-      const items = { ...state.items };
-      delete items[held.id];
-      events.push({ type: 'itemEaten', playerId: otter.id, itemId: held.id, itemType: 'mushroom' });
-      const stacks = Math.min(MAX_MUSHROOM_STACKS, (otter.mushroomStacks ?? 0) + 1);
-      return {
-        ...state,
-        items,
-        otters: {
-          ...state.otters,
-          [otter.id]: {
-            ...otter,
-            carrying: null,
-            action: 'eat',
-            actionMs: TRANSIENT_ACTION_HOLD_MS,
-            mushroomStacks: stacks,
-            scale: MUSHROOM_SCALE ** stacks,
-          },
-        },
-      };
-    }
     default: {
       // branch/stone/dirt: build materials, nothing to "use" in place
       reject('noUseForItem');
@@ -356,11 +281,9 @@ export function applyThrow(
 }
 
 /**
- * dig command: instant. Rolls the weighted LOOT_TABLE (P4-6) via the
- * shared deterministic RNG (state.rngSeed, advanced by exactly one
- * rngStep so multiplayer stays lockstep-consistent — same as the seed
- * rolls in createInitialState). 'poop' reproduces the original P2-01
- * behaviour byte-for-byte: a dirt block at the otter's feet + a pit.
+ * dig command: instant. Spawns a dirt block (a 1-progress build material)
+ * at the otter's feet and opens a pit there. The digger has a grace period;
+ * after that even they can fall into their own hole (working as intended).
  */
 export function applyDig(
   state: GameState,
@@ -373,98 +296,21 @@ export function applyDig(
     return state;
   }
   const itemId = `dirt-${otter.id}-t${state.tick}`;
+  const pitId = `pit-${otter.id}-t${state.tick}`;
   if (state.items[itemId]) {
     reject('alreadyDug'); // second dig in the same tick
     return state;
   }
-
   const pos = otter.pos;
-  const { value, nextSeed } = rngStep(state.rngSeed);
-  const loot = rollLoot(value);
-  const base: GameState = { ...state, rngSeed: nextSeed };
-
-  switch (loot.id) {
-    case 'poop': {
-      const pitId = `pit-${otter.id}-t${state.tick}`;
-      events.push({ type: 'dugDirt', playerId: otter.id, itemId, pos });
-      events.push({ type: 'itemSpawned', itemId, itemType: 'dirt', pos });
-      events.push({ type: 'pitCreated', pitId, pos });
-      events.push({ type: 'lootRolled', playerId: otter.id, outcome: 'poop', itemId });
-      return {
-        ...base,
-        items: { ...base.items, [itemId]: { id: itemId, type: 'dirt', pos, heldBy: null } },
-        pits: [
-          ...base.pits,
-          { id: pitId, pos, diggerId: otter.id, diggerImmuneMs: PIT_DIGGER_IMMUNE_MS },
-        ],
-      };
-    }
-    case 'mushroom': {
-      const mushId = `mushroom-${otter.id}-t${state.tick}`;
-      events.push({ type: 'itemSpawned', itemId: mushId, itemType: 'mushroom', pos });
-      events.push({ type: 'lootRolled', playerId: otter.id, outcome: 'mushroom', itemId: mushId });
-      return {
-        ...base,
-        items: { ...base.items, [mushId]: { id: mushId, type: 'mushroom', pos, heldBy: null } },
-      };
-    }
-    case 'diamond': {
-      events.push({
-        type: 'lootRolled',
-        playerId: otter.id,
-        outcome: 'diamond',
-        scoreAwarded: DIAMOND_SCORE,
-      });
-      return {
-        ...base,
-        otters: {
-          ...base.otters,
-          [otter.id]: { ...otter, score: otter.score + DIAMOND_SCORE },
-        },
-      };
-    }
-    case 'vest': {
-      events.push({
-        type: 'lootRolled',
-        playerId: otter.id,
-        outcome: 'vest',
-        scoreAwarded: VEST_SCORE,
-      });
-      return {
-        ...base,
-        otters: {
-          ...base.otters,
-          [otter.id]: {
-            ...otter,
-            score: otter.score + VEST_SCORE,
-            gear: { ...otter.gear, vest: true },
-          },
-        },
-      };
-    }
-    case 'hat': {
-      events.push({
-        type: 'lootRolled',
-        playerId: otter.id,
-        outcome: 'hat',
-        scoreAwarded: RARE_HAT_SCORE,
-      });
-      return {
-        ...base,
-        otters: {
-          ...base.otters,
-          [otter.id]: {
-            ...otter,
-            score: otter.score + RARE_HAT_SCORE,
-            gear: { ...otter.gear, rareHat: true },
-          },
-        },
-      };
-    }
-    case 'nothing':
-    default: {
-      events.push({ type: 'lootRolled', playerId: otter.id, outcome: 'nothing' });
-      return base;
-    }
-  }
+  events.push({ type: 'dugDirt', playerId: otter.id, itemId, pos });
+  events.push({ type: 'itemSpawned', itemId, itemType: 'dirt', pos });
+  events.push({ type: 'pitCreated', pitId, pos });
+  return {
+    ...state,
+    items: { ...state.items, [itemId]: { id: itemId, type: 'dirt', pos, heldBy: null } },
+    pits: [
+      ...state.pits,
+      { id: pitId, pos, diggerId: otter.id, diggerImmuneMs: PIT_DIGGER_IMMUNE_MS },
+    ],
+  };
 }

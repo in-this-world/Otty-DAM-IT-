@@ -23,7 +23,6 @@ import {
   MAX_PLAYERS,
   type GameConfig,
 } from '../core/state';
-import { accumulateSwimTime, initStats, tallyEvent, type PlayerStats } from '../core/stats';
 import { defaultSystems, reduce, type System } from '../core/tick';
 import type { Command, GameState, Rect } from '../core/types';
 import {
@@ -86,10 +85,6 @@ export class RoomSimulation {
   private _phase: RoomPhase = 'lobby';
   private _state: GameState | null = null;
   private readonly players = new Map<string, RoomPlayer>();
-  /** P4-7: per-session flushed draw-batch count (see doodleCount()). */
-  private readonly doodleCounts = new Map<string, number>();
-  /** P4-8: per-otter stat tally, seeded fresh on start() (see stats()). */
-  private _stats: Record<string, PlayerStats> = {};
   private _ownerId: string | null = null;
   private joinCounter = 0;
   private queue: Command[] = [];
@@ -174,34 +169,9 @@ export class RoomSimulation {
     if (p) p.ready = ready;
   }
 
-  /**
-   * P4-7: record one flushed draw-batch from a session (called by DamRoom
-   * when it relays a ClientMessage.Draw). Tracked server-side so a later
-   * "most doodles" fallback title can read a single authoritative count -
-   * see doodleCount() and the `doodleCount` field on RosterEntry.
-   */
-  recordDrawBatch(sessionId: string): void {
-    this.doodleCounts.set(sessionId, (this.doodleCounts.get(sessionId) ?? 0) + 1);
-  }
-
-  /** Flushed draw-batch count for a session; 0 if never drawn/unknown. */
-  doodleCount(sessionId: string): number {
-    return this.doodleCounts.get(sessionId) ?? 0;
-  }
-
   getProfile(otterId: string): PlayerProfile | null {
     for (const p of this.players.values()) if (p.otterId === otterId) return p.profile;
     return null;
-  }
-
-  /**
-   * P4-7: look up a player's profile by session id (not otter id) so the
-   * server can stamp a Draw broadcast with the sender's own hatColor -
-   * never trust a client-supplied color, else a player could spoof another
-   * player's stroke color.
-   */
-  getProfileBySession(sessionId: string): PlayerProfile | null {
-    return this.players.get(sessionId)?.profile ?? null;
   }
 
   /** True when every non-spectator player has readied (owner may start). */
@@ -236,35 +206,9 @@ export class RoomSimulation {
       ...(this.world ? { world: this.world } : {}),
       ...(this.water ? { water: this.water } : {}),
       ...(this.hazards ? { hazards: this.hazards } : {}),
-      // P4-3: multiplayer rounds never spawn the eagle/bear hazards.
-      isMultiplayer: true,
     });
     this._phase = 'playing';
     this.queue = [];
-    // P4-8: fresh stat tally for every otter this round.
-    this._stats = {};
-    for (const id of Object.keys(this._state.otters)) this._stats[id] = initStats();
-    return true;
-  }
-
-  /**
-   * P4-4: owner-only, once the round has ended -> back to the 準備室 lobby.
-   * No-op (returns false) unless the room is 'ended' AND `bySessionId` is
-   * the current owner. On success: phase -> 'lobby', the finished GameState
-   * is dropped, the command queue is cleared, and every roster player's
-   * `ready` flag resets to false. This is NOT a re-join: connections,
-   * profiles, colors, joinSeq, and otterId all survive untouched, so the
-   * roster looks the same (minus readiness) when the 準備室 screen reappears.
-   */
-  restart(bySessionId: string): boolean {
-    if (this._phase !== 'ended') return false;
-    if (bySessionId !== this._ownerId) return false;
-
-    this._phase = 'lobby';
-    this._state = null;
-    this.queue = [];
-    this._stats = {};
-    for (const p of this.players.values()) p.ready = false;
     return true;
   }
 
@@ -364,26 +308,11 @@ export class RoomSimulation {
     this.queue = [];
     const { state, events } = reduce(this._state, commands, dtMs, this.systems);
     this._state = state;
-    // P4-8: tally per-tick events, then sample swim time off the new state.
-    let stats = this._stats;
-    for (const event of events) stats = tallyEvent(stats, event);
-    stats = accumulateSwimTime(stats, state, dtMs);
-    this._stats = stats;
     if (state.phase === 'won' || state.phase === 'lost') this._phase = 'ended';
     return { state, events };
   }
 
   snapshot(): SnapshotPayload | null {
     return this._state ? { state: this._state, events: [] } : null;
-  }
-
-  /**
-   * P4-8: current per-otter stat tally for this round (empty before
-   * start(), reset on restart()). The end screen merges doodleCount from
-   * the roster payload (RosterEntry.doodleCount, matched by otterId) since
-   * doodles are tracked per-session, not per-otter, on this class.
-   */
-  stats(): Readonly<Record<string, PlayerStats>> {
-    return this._stats;
   }
 }
