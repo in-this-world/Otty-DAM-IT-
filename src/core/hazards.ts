@@ -27,12 +27,32 @@ import type {
   EagleState,
   GameEvent,
   GameState,
+  HazardKind,
   HazardSpawn,
   HazardsState,
   ItemState,
   OtterState,
   Vec2,
 } from './types';
+
+/**
+ * P4-3: which hazard kinds may spawn in multiplayer. Both current hazards single
+ * out one otter (eagle carries you off, bear chases + swats), which feels unfair
+ * in a co-op party race — so both are single-player only.
+ */
+export const HAZARD_MP_ALLOWED: Readonly<Record<HazardKind, boolean>> = {
+  eagle: false,
+  bear: false,
+};
+
+/** Drop hazard spawns not allowed in the current mode (multiplayer filters). */
+export function filterHazardsForMode(
+  spawns: readonly HazardSpawn[],
+  opts: { readonly multiplayer: boolean },
+): HazardSpawn[] {
+  if (!opts.multiplayer) return [...spawns];
+  return spawns.filter((s) => HAZARD_MP_ALLOWED[s.kind]);
+}
 
 /* ---- Tuning constants (P2-04 owns these; see Docs/P2-04_summary.md). ---- */
 

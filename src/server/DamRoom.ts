@@ -61,6 +61,13 @@ export class DamRoom extends Room {
         this.startLoop();
       }
     });
+    this.onMessage(ClientMessage.Restart, (client) => {
+      // P4-4: only the owner can send everyone back to the lobby.
+      if (this.sim.restart(client.sessionId)) {
+        this.stopLoop();
+        this.broadcastRoster();
+      }
+    });
     this.onMessage(ClientMessage.Command, (client, msg: ClientCommand) => {
       this.sim.enqueue(client.sessionId, msg);
     });
@@ -96,11 +103,17 @@ export class DamRoom extends Room {
     if (this.looping) return;
     this.looping = true;
     this.setSimulationInterval((dtMs) => {
+      if (!this.looping) return;
       const snap = this.sim.step(dtMs);
       if (!snap) return;
       this.broadcast(ServerMessage.Snapshot, snap);
       if (this.sim.phase === 'ended') this.broadcastRoster();
     }, DEFAULT_TICK_MS);
+  }
+
+  /** P4-4: pause the tick loop when a round ends / the room returns to lobby. */
+  private stopLoop(): void {
+    this.looping = false;
   }
 
   private rosterPayload(): RosterPayload {

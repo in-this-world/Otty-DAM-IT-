@@ -12,6 +12,7 @@
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
 import { t } from '../../i18n';
+import { buildEndScreenRows } from '../end-screen';
 import { BUILD_ZONE_HALF } from '../../core/dam';
 import { planOtterCommands, recommendedAiCount } from '../../core/ai';
 import { DEFAULT_OTTER_SPEED_PER_SEC,
@@ -390,19 +391,41 @@ export class GameScene extends Phaser.Scene {
     const won = state.phase === 'won';
     const title = won ? t('game.win') : t('game.lose');
     const box = this.add
-      .rectangle(480, 270, 560, 200, 0x00304a, 0.92)
+      .rectangle(480, 270, 600, 240, 0x00304a, 0.92)
       .setStrokeStyle(2, 0xffffff)
       .setInteractive({ useHandCursor: true });
     box.on(Phaser.Input.Events.POINTER_DOWN, () => {
       if (this.latest && this.latest.phase !== 'playing') this.restart();
     });
     const t1 = this.add
-      .text(480, 240, title, { fontSize: '30px', color: won ? '#62d96b' : '#ff8080' })
+      .text(480, 202, title, { fontSize: '30px', color: won ? '#62d96b' : '#ff8080' })
       .setOrigin(0.5);
     const t2 = this.add
-      .text(480, 300, t('game.restartHint'), { fontSize: '18px', color: '#ffffff' })
+      .text(480, 348, t('game.restartHint'), { fontSize: '18px', color: '#ffffff' })
       .setOrigin(0.5);
-    this.overlay = this.add.container(0, 0, [box, t1, t2]);
+    // P4-2: a portrait strip with each player's name above their win/lose spirit.
+    const strip = this.buildEndScreenStrip(state, 272);
+    this.overlay = this.add.container(0, 0, [box, t1, t2, ...strip]);
+  }
+
+  /** P4-2: name-labelled win/lose portraits, centered at y. */
+  private buildEndScreenStrip(state: GameState, y: number): Phaser.GameObjects.GameObject[] {
+    const names = (this.game.registry.get('netRosterNames') as Record<string, string> | undefined) ?? {};
+    const rows = buildEndScreenRows(state.otters, state.phase, names);
+    const objs: Phaser.GameObjects.GameObject[] = [];
+    const spacing = 96;
+    const startX = 480 - ((rows.length - 1) * spacing) / 2;
+    rows.forEach((row, i) => {
+      const x = startX + i * spacing;
+      const sprite = this.add.sprite(x, y, OTTER_TEXTURE);
+      if (this.anims.exists(row.animKey)) sprite.play(row.animKey);
+      if (sprite.height > 0) sprite.setScale(56 / sprite.height);
+      const label = this.add
+        .text(x, y - 44, row.name, { fontSize: '15px', color: '#ffffff' })
+        .setOrigin(0.5);
+      objs.push(sprite, label);
+    });
+    return objs;
   }
 
   /** Show mobile controls on touch devices or a narrow viewport (P2-06). */
@@ -461,7 +484,36 @@ export class GameScene extends Phaser.Scene {
         this.transientAnims.set(ta.otterId, { animKey: ta.animKey, expiresAt: this.time.now + ta.durationMs });
       }
       for (const fx of effectsForEvent(ev, state)) this.spawnEffect(fx);
+      // P4-1: nudge the local player when they poke with no stick in hand.
+      if (
+        ev.type === 'commandRejected' &&
+        ev.command === 'poke' &&
+        ev.reason === 'noStick' &&
+        ev.playerId === this.localId
+      ) {
+        this.showToast(t('hint.needStick'));
+      }
     }
+  }
+
+  /** Brief centered toast that holds, then fades out and destroys itself. */
+  private showToast(message: string): void {
+    const toast = this.add
+      .text(WORLD.width / 2, 96, message, {
+        fontSize: '20px',
+        color: '#ffffff',
+        backgroundColor: '#00304acc',
+        padding: { x: 12, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setDepth(2000);
+    this.tweens.add({
+      targets: toast,
+      alpha: 0,
+      delay: 900,
+      duration: 600,
+      onComplete: () => toast.destroy(),
+    });
   }
 
   /** Spawn a short-lived sprite that rises + fades, then destroys itself. */

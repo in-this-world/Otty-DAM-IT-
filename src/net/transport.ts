@@ -101,6 +101,9 @@ export class LoopbackTransport implements NetTransport {
       case ClientMessage.StartGame:
         this.sim.start(this.sessionId);
         break;
+      case ClientMessage.Restart:
+        this.sim.restart(this.sessionId);
+        break;
       default:
         break;
     }

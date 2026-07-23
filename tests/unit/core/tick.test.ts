@@ -46,8 +46,13 @@ describe('core/tick reduce', () => {
   });
 
   it('a valid poke command produces an otterPoked event', () => {
-    const input = playing();
-    const id = firstOtterId(input);
+    const base = playing();
+    const id = firstOtterId(base);
+    // P4-1: a poke needs a stick in hand.
+    const input = {
+      ...base,
+      otters: { ...base.otters, [id]: { ...base.otters[id]!, carrying: 'branch' as const } },
+    };
     const { events } = reduce(input, [{ type: 'poke', playerId: id }], TICK_MS);
     expect(events).toContainEqual({ type: 'otterPoked', attackerId: id, targetId: null });
   });

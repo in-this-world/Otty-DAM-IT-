@@ -160,6 +160,8 @@ export const ClientMessage = {
   SetProfile: 'profile',
   SetReady: 'ready',
   StartGame: 'start',
+  /** P4-4: host returns the room to the lobby for another round. */
+  Restart: 'restart',
 } as const;
 
 /** Server -> client message names. */

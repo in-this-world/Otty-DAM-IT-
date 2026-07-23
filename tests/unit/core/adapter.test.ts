@@ -47,10 +47,12 @@ describe('core/adapter LocalAdapter (fake clock, no real timers)', () => {
     adapter.onEvents((e) => all.push(...e));
     adapter.start();
     const id = firstOtterId(adapter.getState());
-    adapter.sendCommand({ type: 'poke', playerId: id });
+    // A one-shot command (move) must fire its event exactly once, even though
+    // the tick loop advances twice — i.e. the queue isn't re-applied.
+    adapter.sendCommand({ type: 'move', playerId: id, dir: 'up' });
     scheduler.advance(50);
     scheduler.advance(50);
-    expect(all.filter((e) => e.type === 'otterPoked')).toHaveLength(1);
+    expect(all.filter((e) => e.type === 'otterMoved')).toHaveLength(1);
   });
 
   it('stop() halts the loop; start() is idempotent', () => {

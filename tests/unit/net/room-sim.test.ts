@@ -168,3 +168,81 @@ describe('RoomSimulation — disconnect / reconnect (P3-04 policy)', () => {
     expect(room.roster().map((p) => p.sessionId)).toEqual(['sB', 'sC']);
   });
 });
+
+describe('RoomSimulation — host restart to lobby (P4-4)', () => {
+  const playTwoToEnd = () => {
+    const room = newRoom({ timerMs: 100 });
+    room.join('sA');
+    room.join('sB');
+    room.start('sA');
+    // run past the timer so the round ends (flood/loss settles the phase)
+    for (let i = 0; i < 5 && room.phase === 'playing'; i++) room.step(50);
+    return room;
+  };
+
+  it('ignores a restart from a non-owner', () => {
+    const room = playTwoToEnd();
+    expect(room.phase).toBe('ended');
+    expect(room.restart('sB')).toBe(false);
+    expect(room.phase).toBe('ended');
+  });
+
+  it('owner restart returns the room to the lobby and clears game state', () => {
+    const room = playTwoToEnd();
+    expect(room.restart('sA')).toBe(true);
+    expect(room.phase).toBe('lobby');
+    expect(room.state).toBeNull();
+  });
+
+  it('resets every player to un-ready and keeps their connection + profile', () => {
+    const room = newRoom({ timerMs: 100 });
+    room.join('sA', { hatColor: '#ff0000' });
+    room.join('sB');
+    room.setReady('sA', true);
+    room.setReady('sB', true);
+    room.start('sA');
+    for (let i = 0; i < 5 && room.phase === 'playing'; i++) room.step(50);
+    room.restart('sA');
+    expect(room.roster().every((p) => p.ready === false)).toBe(true);
+    expect(room.roster().every((p) => p.connected)).toBe(true);
+    expect(room.getProfile('otter-1')?.hatColor ?? room.roster()[0]!.profile.hatColor).toBe('#ff0000');
+  });
+
+  it('promotes mid-game spectators to players so they can play the next round', () => {
+    const room = newRoom({ timerMs: 100 });
+    room.join('sA');
+    room.start('sA');
+    const late = room.join('sB'); // joins mid-game -> spectator
+    expect(late.spectator).toBe(true);
+    for (let i = 0; i < 5 && room.phase === 'playing'; i++) room.step(50);
+    room.restart('sA');
+    expect(room.roster().every((p) => !p.spectator)).toBe(true);
+    // a fresh start now seats both as otters
+    room.start('sA');
+    expect(Object.keys(room.state!.otters).sort()).toEqual(['otter-1', 'otter-2']);
+  });
+
+  it('a restarted round rebuilds fresh state (dam progress back to 0)', () => {
+    const room = playTwoToEnd();
+    room.restart('sA');
+    room.start('sA');
+    expect(room.state!.dam.progress).toBe(0);
+    expect(room.phase).toBe('playing');
+  });
+
+  it('cannot restart from the lobby (nothing to reset)', () => {
+    const room = newRoom();
+    room.join('sA');
+    expect(room.restart('sA')).toBe(false);
+  });
+
+  it('hands the crown to the earliest remaining player when the host leaves', () => {
+    const room = newRoom();
+    room.join('sA');
+    room.join('sB');
+    room.join('sC');
+    expect(room.ownerId).toBe('sA');
+    room.disconnect('sA'); // in lobby -> leaves outright
+    expect(room.ownerId).toBe('sB');
+  });
+});

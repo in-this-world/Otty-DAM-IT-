@@ -4,6 +4,7 @@
  * what makes lockstep/local replay and later server authority possible.
  */
 import { requiredProgress } from './dam';
+import { filterHazardsForMode } from './hazards';
 import { fishBounds } from './fish';
 import { rngStep } from './rng';
 import type {
@@ -62,6 +63,12 @@ export interface GameConfig {
     readonly count?: number;
     readonly schedule?: readonly { readonly kind: HazardKind; readonly atElapsedMs: number }[];
   };
+  /**
+   * P4-3: multiplayer round. Hazard kinds not in HAZARD_MP_ALLOWED (eagle, bear)
+   * are filtered out so networked party rounds never spawn them. Single-player
+   * (default false) is unchanged.
+   */
+  readonly multiplayer?: boolean;
 }
 
 export const DEFAULT_TIMER_MS = 240_000;
@@ -197,9 +204,11 @@ export function createInitialState(config: GameConfig): GameState {
         spawns.push({ kind: rk.value < 0.5 ? 'eagle' : 'bear', atTimerMs: timerMs - atElapsedMs });
       }
     }
+    // P4-3: strip hazard kinds disallowed in the current mode (multiplayer).
+    const allowed = filterHazardsForMode(spawns, { multiplayer: config.multiplayer ?? false });
     // Fire earliest-in-round first: descending atTimerMs.
-    spawns.sort((a, b) => b.atTimerMs - a.atTimerMs);
-    hazards = { eagle: null, bear: null, schedule: spawns };
+    allowed.sort((a, b) => b.atTimerMs - a.atTimerMs);
+    hazards = { eagle: null, bear: null, schedule: allowed };
   }
 
   return {

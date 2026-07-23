@@ -201,6 +201,7 @@ export class RoomSimulation {
       playerCount: active.length,
       seed: this.seed,
       phase: 'playing',
+      multiplayer: true,
       ...(this.timerMs !== undefined ? { timerMs: this.timerMs } : {}),
       damRequiredPerPlayer: this.damRequiredPerPlayer,
       ...(this.world ? { world: this.world } : {}),
@@ -209,6 +210,38 @@ export class RoomSimulation {
     });
     this._phase = 'playing';
     this.queue = [];
+    return true;
+  }
+
+  /**
+   * P4-4: host sends everyone back to the 準備室 lobby for another round.
+   * Owner-gated when `bySessionId` is supplied; only valid once a round has
+   * begun (playing or ended). The game state is discarded — otter size (P4-5),
+   * equipment/loot (P4-6) and map objects all live in it, so they reset for
+   * free — everyone is un-readied, disconnected stragglers are dropped, and any
+   * mid-game spectator is promoted to a player for the next round. Connections,
+   * profiles (nickname/hat/scarf) and ownership are preserved. The dam
+   * requirement rebuilds from the fresh roster on the next start().
+   */
+  restart(bySessionId?: string): boolean {
+    if (this._phase === 'lobby') return false;
+    if (bySessionId !== undefined && bySessionId !== this._ownerId) return false;
+
+    this._state = null;
+    this._phase = 'lobby';
+    this.queue = [];
+
+    for (const p of [...this.players.values()]) {
+      if (!p.connected) {
+        this.players.delete(p.sessionId); // a straggler who never came back
+        continue;
+      }
+      p.ready = false;
+      p.spectator = false;
+      p.reconnectMsLeft = 0;
+      p.otterId = null; // reassigned densely on the next start()
+    }
+    if (this._ownerId === null || !this.players.has(this._ownerId)) this.handoffOwner();
     return true;
   }
 

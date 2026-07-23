@@ -15,6 +15,7 @@ function twoOtters(opts: {
   targetCarries?: boolean;
   targetInvuln?: number;
   attackerStunned?: number;
+  attackerHasStick?: boolean;
 }): GameState {
   const s = createInitialState({
     playerCount: 2,
@@ -26,7 +27,13 @@ function twoOtters(opts: {
   const t = s.otters['otter-2'];
   if (!a || !t) throw new Error('missing otters');
   const otters: Record<string, OtterState> = {
-    'otter-1': { ...a, pos: opts.attackerPos, stunnedMs: opts.attackerStunned ?? 0 },
+    'otter-1': {
+      ...a,
+      pos: opts.attackerPos,
+      stunnedMs: opts.attackerStunned ?? 0,
+      // P4-1: a poke needs a stick in hand; default the attacker to holding one.
+      carrying: opts.attackerHasStick === false ? null : 'branch',
+    },
     'otter-2': {
       ...t,
       pos: opts.targetPos,
@@ -143,6 +150,54 @@ describe('P2-02 poke', () => {
     expect(next.otters['otter-2']!.carrying).toBe('branch'); // untouched
     expect(
       events.some((e) => e.type === 'commandRejected' && e.reason === 'stunned'),
+    ).toBe(true);
+  });
+});
+
+describe('P4-1 poke requires a stick', () => {
+  it('an empty-handed poke is rejected and changes nothing', () => {
+    const s = twoOtters({
+      attackerPos: { x: 100, y: 100 },
+      targetPos: { x: 120, y: 100 },
+      targetCarries: true,
+      attackerHasStick: false,
+    });
+    const events: GameEvent[] = [];
+    const reasons: string[] = [];
+    const next = applyPoke(s, s.otters['otter-1']!, events, (r) => reasons.push(r));
+
+    expect(reasons).toEqual(['noStick']);
+    // no target search, no pose change, no events at all
+    expect(next).toBe(s); // same reference: state completely untouched
+    expect(next.otters['otter-1']!.action).not.toBe('poke');
+    expect(next.otters['otter-2']!.carrying).toBe('branch');
+    expect(events).toHaveLength(0);
+  });
+
+  it('with a stick, the poke lands as before', () => {
+    const s = twoOtters({
+      attackerPos: { x: 100, y: 100 },
+      targetPos: { x: 120, y: 100 },
+      targetCarries: true,
+      attackerHasStick: true,
+    });
+    const events: GameEvent[] = [];
+    const next = applyPoke(s, s.otters['otter-1']!, events);
+    expect(next.otters['otter-2']!.carrying).toBeNull();
+    expect(events.some((e) => e.type === 'otterPoked' && e.targetId === 'otter-2')).toBe(true);
+  });
+
+  it('through reduce(): an empty-handed poke emits commandRejected noStick', () => {
+    const s = twoOtters({
+      attackerPos: { x: 200, y: 200 },
+      targetPos: { x: 220, y: 200 },
+      targetCarries: true,
+      attackerHasStick: false,
+    });
+    const { state: next, events } = reduce(s, [{ type: 'poke', playerId: 'otter-1' }], 50);
+    expect(next.otters['otter-2']!.carrying).toBe('branch'); // untouched
+    expect(
+      events.some((e) => e.type === 'commandRejected' && e.command === 'poke' && e.reason === 'noStick'),
     ).toBe(true);
   });
 });

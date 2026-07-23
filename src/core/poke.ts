@@ -14,6 +14,9 @@ import { TRANSIENT_ACTION_HOLD_MS } from './action';
 import { repelBear, repelEagle } from './hazards';
 import type { GameEvent, GameState, HazardsState, ItemState, OtterState } from './types';
 
+/** Reject callback shape shared with the other command handlers. */
+type Reject = (reason: string) => void;
+
 /** Reach of a poke, world units. */
 export const POKE_RADIUS = 90;
 /** Invulnerability granted to a poked otter, ms (v0.1 §4: 2s 無敵幀). */
@@ -37,8 +40,22 @@ function heldItemOf(
   return Object.values(items).find((i) => i.heldBy === otterId);
 }
 
-/** poke command: knock the nearest otter's item loose + grant them i-frames. */
-export function applyPoke(state: GameState, otter: OtterState, events: GameEvent[]): GameState {
+/**
+ * poke command: knock the nearest otter's item loose + grant them i-frames.
+ * P4-1: a poke needs a stick (branch) in hand — an empty-handed poke is
+ * rejected with `noStick` and has no effect at all (no target search, no pose
+ * change, no hazard repel, no events).
+ */
+export function applyPoke(
+  state: GameState,
+  otter: OtterState,
+  events: GameEvent[],
+  reject: Reject = () => {},
+): GameState {
+  if (otter.carrying !== 'branch') {
+    reject('noStick');
+    return state;
+  }
   let target: OtterState | null = null;
   let bestDist = Infinity;
   for (const o of Object.values(state.otters)) {
