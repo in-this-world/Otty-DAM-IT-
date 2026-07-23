@@ -11,6 +11,7 @@
  */
 import Phaser from 'phaser';
 import { LocalAdapter, type GameAdapter, type Unsubscribe } from '../../core/adapter';
+import { t } from '../../i18n';
 import { BUILD_ZONE_HALF } from '../../core/dam';
 import { planOtterCommands, recommendedAiCount } from '../../core/ai';
 import { DEFAULT_OTTER_SPEED_PER_SEC,
@@ -368,7 +369,7 @@ export class GameScene extends Phaser.Scene {
     this.hudTimer = this.add
       .text(WORLD.width - 16, 16, '--:--', { fontSize: '24px', color: '#ffffff' })
       .setOrigin(1, 0);
-    this.add.text(16, 40, 'WASD移動 · E撿放 · B建造 · F戳 · C游泳 · T丟 · G挖 · Q吃', {
+    this.add.text(16, 40, t('hud.controls'), {
       fontSize: '13px',
       color: '#cfe8ef',
     });
@@ -387,7 +388,7 @@ export class GameScene extends Phaser.Scene {
   private renderOverlay(state: GameState): void {
     if (state.phase === 'playing' || this.overlay) return;
     const won = state.phase === 'won';
-    const title = won ? '水壩完工!全員獲勝 🎉' : '洪水來了……下次加油!';
+    const title = won ? t('game.win') : t('game.lose');
     const box = this.add
       .rectangle(480, 270, 560, 200, 0x00304a, 0.92)
       .setStrokeStyle(2, 0xffffff)
@@ -399,7 +400,7 @@ export class GameScene extends Phaser.Scene {
       .text(480, 240, title, { fontSize: '30px', color: won ? '#62d96b' : '#ff8080' })
       .setOrigin(0.5);
     const t2 = this.add
-      .text(480, 300, '按 R 再來一局', { fontSize: '18px', color: '#ffffff' })
+      .text(480, 300, t('game.restartHint'), { fontSize: '18px', color: '#ffffff' })
       .setOrigin(0.5);
     this.overlay = this.add.container(0, 0, [box, t1, t2]);
   }
