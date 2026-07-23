@@ -59,6 +59,22 @@
 | P3-04 | C | Tester | 多人測試:2 人合作勝利、10 人房、斷線重連 | P3-03 | 全綠 | done* | Claude 2026-07-13(in-process 多人整合 3 測全綠;301 unit+build 綠。*真 host 雙瀏覽器待) |
 | P3-05 | B | Developer | 準備室 personalization:暱稱(localStorage)+帽/圍巾顏色+頭頂名牌、免登入 | P3-02 | 暱稱/顏色持久化、名牌顯示 | done | Claude 2026-07-13(protocol PlayerProfile+profile-store+接進準備室;5 測) |
 
+## P4 遊戲改進(2026-07-17 播測回饋;詳見 水獺蓋水壩/P4_遊戲改進計畫.md)
+
+> 全遊戲中英文 i18n + 玩法修正。**重建版**(前一版已 revert,不合標準)。實作順序:i18n → core → loot → endgame(drawing 可並行)。
+
+| ID | 分支 | 任務 | 驗收條件 | 狀態 | Owner |
+|---|---|---|---|---|---|
+| P4-0 | feat/P4-i18n | i18n 基礎:t/setLang/getLang/toggleLang/onLangChange + zh-TW/en 字典;全 UI 走 t();大廳 EN/中 即時切換 | i18n 單測 + 字典完整性(鍵/佔位對齊);全 UI 無硬編字串 | done | Claude 2026-07-23(Docs/P4-0_summary.md;317 綠) |
+| P4-1 | feat/P4-core | 沒木棍不能戳(reject noStick + 提示 toast);多人 host 端同樣拒絕 | unit:空手戳無效、有棍可戳、reduce 出 commandRejected | done | Claude 2026-07-23 |
+| P4-2 | feat/P4-core | 結局畫面每隻 spirit 上方顯示玩家名(純 end-screen.ts) | unit:名字解析(暱稱→P1/AI 保底)+ 排序 + 勝敗立繪 | done | Claude 2026-07-23 |
+| P4-3 | feat/P4-core | 多人不生成熊與老鷹(filterHazardsForMode + multiplayer 旗標) | unit:多人過濾、單人保留;createInitialState 抑制 | done | Claude 2026-07-23 |
+| P4-4 | feat/P4-core | 房主 Restart 回等待室(RoomSimulation.restart + protocol/DamRoom/loopback);房主交接 | unit:非房主忽略、房主重置回 lobby、觀戰晉升、重開新局 | done* | Claude 2026-07-23(*網路端 client 演出〔host Restart 鈕送訊息+回準備室〕待續) |
+| P4-5 | feat/P4-loot | 蘑菇食用,放大可疊 4 次(scale/hitbox) | unit:吃菇放大 1.5^n、上限 4、統計照計 | ready | — |
+| P4-6 | feat/P4-loot | 挖掘戰利品表(注入 RNG,權重);背心/帽自動裝備加分 | unit:權重區間、裝備加分、host 擲骰廣播 | ready | — |
+| P4-7 | feat/P4-drawing | 等待室共享畫布(批次 50ms 送點,帽色筆刷,清除,開局淡出) | unit:draw-batch 批次;E2E 兩端即時同步 | ready | — |
+| P4-8 | feat/P4-endgame | 統計、稱號(雙語)與結算畫面(依賴 P4-5/6) | unit:數據冠軍稱號、每人一不重複含保底 | ready | 依賴 P4-5/6 |
+
 ## P4 打磨 / P5 上線(摘要,屆時由 PM 展開細項)
 
 | ID | 泳道 | 角色 | 任務 | 依賴 |
